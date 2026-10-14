@@ -34,17 +34,24 @@ class _ProfileViewState extends State<ProfileView> {
 
   void _loadProfile() {
     setState(() {
+      final isLogged = AuthService.currentUser != null;
       final googleName = AuthService.displayName;
       final googlePhoto = AuthService.photoUrl;
 
-      _name = HiveService.name.isNotEmpty
-          ? HiveService.name
-          : (googleName != null && googleName.isNotEmpty ? googleName : 'Usuário ZUVEX');
-      _email = AuthService.currentEmail ??
-          (HiveService.email.isNotEmpty ? HiveService.email : 'usuario@zuvex.com');
-      _avatarPath = HiveService.avatarPath.isNotEmpty
-          ? HiveService.avatarPath
-          : (googlePhoto ?? '');
+      if (!isLogged) {
+        _name = 'Visitante';
+        _email = 'Entre para publicar anúncios e salvar favoritos';
+        _avatarPath = '';
+      } else {
+        _name = HiveService.name.isNotEmpty
+            ? HiveService.name
+            : (googleName != null && googleName.isNotEmpty ? googleName : 'Usuário ZUVEX');
+        _email = AuthService.currentEmail ??
+            (HiveService.email.isNotEmpty ? HiveService.email : 'usuario@zuvex.com');
+        _avatarPath = HiveService.avatarPath.isNotEmpty
+            ? HiveService.avatarPath
+            : (googlePhoto ?? '');
+      }
     });
   }
 
@@ -214,6 +221,20 @@ class _ProfileViewState extends State<ProfileView> {
                             ],
                           ],
                         ),
+                        if (AuthService.currentUser == null) ...[
+                          const SizedBox(height: 10),
+                          ElevatedButton.icon(
+                            style: ElevatedButton.styleFrom(
+                              backgroundColor: AppColors.primary,
+                              foregroundColor: Colors.white,
+                              padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
+                              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                            ),
+                            icon: const Icon(Icons.login_rounded, size: 16),
+                            label: const Text('Entrar ou Criar Conta', style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold)),
+                            onPressed: () => Get.toNamed(AppRoutes.login)?.then((_) => _loadProfile()),
+                          ),
+                        ],
                       ],
                     ),
                   ),
@@ -302,21 +323,32 @@ class _ProfileViewState extends State<ProfileView> {
                     );
                   },
                 ),
-                _MenuEntry(
-                  icon: Icons.delete_forever_rounded,
-                  label: 'Excluir Minha Conta e Dados',
-                  iconColor: AppColors.error,
-                  labelColor: AppColors.error,
-                  onTap: () => _confirmDeleteAccount(context),
-                ),
-                _MenuEntry(
-                  icon: Iconsax.logout,
-                  label: 'Sair da Conta',
-                  iconColor: AppColors.error,
-                  labelColor: AppColors.error,
-                  onTap: () => _confirmSignOut(context),
-                  showChevron: false,
-                ),
+                if (AuthService.currentUser != null) ...[
+                  _MenuEntry(
+                    icon: Icons.delete_forever_rounded,
+                    label: 'Excluir Minha Conta e Dados',
+                    iconColor: AppColors.error,
+                    labelColor: AppColors.error,
+                    onTap: () => _confirmDeleteAccount(context),
+                  ),
+                  _MenuEntry(
+                    icon: Iconsax.logout,
+                    label: 'Sair da Conta',
+                    iconColor: AppColors.error,
+                    labelColor: AppColors.error,
+                    onTap: () => _confirmSignOut(context),
+                    showChevron: false,
+                  ),
+                ] else ...[
+                  _MenuEntry(
+                    icon: Iconsax.login,
+                    label: 'Fazer Login / Criar Conta',
+                    iconColor: AppColors.primary,
+                    labelColor: AppColors.primary,
+                    onTap: () => Get.toNamed(AppRoutes.login)?.then((_) => _loadProfile()),
+                    showChevron: true,
+                  ),
+                ],
               ],
             ),
             const SizedBox(height: 36),

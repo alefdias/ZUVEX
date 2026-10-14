@@ -23,18 +23,25 @@ class _SplashViewState extends State<SplashView> {
   Future<void> _checkSession() async {
     await Future.delayed(const Duration(milliseconds: 1200));
 
-    // No Linux/Windows: Firebase não disponível → vai direto para Home
+    // Se Firebase não estiver pronto (modo demo desktop), abre tela de login
     if (!firebaseReady) {
-      if (mounted) Get.offAllNamed(AppRoutes.home);
+      if (mounted) Get.offAllNamed(AppRoutes.login);
       return;
     }
 
     try {
-      FirebaseAuth.instance.currentUser;
-      if (mounted) Get.offAllNamed(AppRoutes.home);
-      // user logado — sessão restaurada pelo controller de favoritos
+      final user = FirebaseAuth.instance.currentUser;
+      if (mounted) {
+        if (user != null) {
+          // Usuário já conectado → abre Home
+          Get.offAllNamed(AppRoutes.home);
+        } else {
+          // Usuário NÃO conectado → pede login obrigatoriamente
+          Get.offAllNamed(AppRoutes.login);
+        }
+      }
     } catch (_) {
-      if (mounted) Get.offAllNamed(AppRoutes.home);
+      if (mounted) Get.offAllNamed(AppRoutes.login);
     }
   }
 

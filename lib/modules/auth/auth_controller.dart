@@ -23,6 +23,6 @@ class AuthController extends GetxController {
       Get.find<BottomNavController>().currentIndex.value = 0;
     } catch (_) {}
 
-    Get.offAllNamed(AppRoutes.home);
+    Get.offAllNamed(AppRoutes.login);
   }
 }
