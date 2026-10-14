@@ -3,6 +3,7 @@ import 'package:flutter/services.dart';
 import 'package:google_sign_in/google_sign_in.dart';
 import 'package:local_auth/local_auth.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+import 'hive_service.dart';
 import '../../main.dart' show firebaseReady;
 
 /// Serviço central de autenticação do ZUVEX.
@@ -91,6 +92,24 @@ class AuthService {
       );
 
       final userCredential = await _auth!.signInWithCredential(credential);
+
+      // Sincroniza dados do Google (nome, email e foto oficial) no perfil local
+      if (userCredential.user != null) {
+        final u = userCredential.user!;
+        final name = (u.displayName != null && u.displayName!.isNotEmpty)
+            ? u.displayName!
+            : (HiveService.name.isNotEmpty ? HiveService.name : 'Usuário ZUVEX');
+        final email = u.email ?? '';
+        final avatar = (u.photoURL != null && u.photoURL!.isNotEmpty)
+            ? u.photoURL!
+            : HiveService.avatarPath;
+
+        await HiveService.saveProfile(
+          name: name,
+          email: email,
+          avatarPath: avatar,
+        );
+      }
 
       // Salva e-mail para uso futuro na biometria
       if (userCredential.user?.email != null) {

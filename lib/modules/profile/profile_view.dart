@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
+import 'package:cached_network_image/cached_network_image.dart';
 import 'package:iconsax/iconsax.dart';
 import '../../app/routes.dart';
 import '../../app/theme.dart';
@@ -33,10 +34,17 @@ class _ProfileViewState extends State<ProfileView> {
 
   void _loadProfile() {
     setState(() {
-      _name = HiveService.name.isNotEmpty ? HiveService.name : 'Usuário ZUVEX';
+      final googleName = AuthService.displayName;
+      final googlePhoto = AuthService.photoUrl;
+
+      _name = HiveService.name.isNotEmpty
+          ? HiveService.name
+          : (googleName != null && googleName.isNotEmpty ? googleName : 'Usuário ZUVEX');
       _email = AuthService.currentEmail ??
           (HiveService.email.isNotEmpty ? HiveService.email : 'usuario@zuvex.com');
-      _avatarPath = HiveService.avatarPath;
+      _avatarPath = HiveService.avatarPath.isNotEmpty
+          ? HiveService.avatarPath
+          : (googlePhoto ?? '');
     });
   }
 
@@ -129,11 +137,26 @@ class _ProfileViewState extends State<ProfileView> {
                     backgroundColor: AppColors.primaryLight,
                     child: _avatarPath.isNotEmpty
                         ? ClipOval(
-                            child: Image.asset(
-                              _avatarPath,
-                              fit: BoxFit.cover,
-                              errorBuilder: (_, __, ___) => const Icon(Icons.person, size: 36, color: AppColors.primary),
-                            ),
+                            child: _avatarPath.startsWith('http://') || _avatarPath.startsWith('https://')
+                                ? CachedNetworkImage(
+                                    imageUrl: _avatarPath,
+                                    width: 68,
+                                    height: 68,
+                                    fit: BoxFit.cover,
+                                    placeholder: (_, __) => const SizedBox(
+                                      width: 24,
+                                      height: 24,
+                                      child: CircularProgressIndicator(strokeWidth: 2, color: AppColors.primary),
+                                    ),
+                                    errorWidget: (_, __, ___) => const Icon(Icons.person, size: 36, color: AppColors.primary),
+                                  )
+                                : Image.asset(
+                                    _avatarPath,
+                                    width: 68,
+                                    height: 68,
+                                    fit: BoxFit.cover,
+                                    errorBuilder: (_, __, ___) => const Icon(Icons.person, size: 36, color: AppColors.primary),
+                                  ),
                           )
                         : const Icon(Icons.person, size: 36, color: AppColors.primary),
                   ),
