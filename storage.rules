@@ -1,0 +1,23 @@
+rules_version = '2';
+service firebase.storage {
+  match /b/{bucket}/o {
+    
+    // Fotos dos Anúncios
+    match /ads/{adId}/{imageName} {
+      // Leitura pública
+      allow read: if true;
+      // Upload apenas para imagens até 5MB pelo usuário autenticado
+      allow write: if request.auth != null
+                   && request.resource.size < 5 * 1024 * 1024
+                   && request.resource.contentType.matches('image/.*');
+    }
+
+    // Avatares de Perfil
+    match /avatars/{userId}/{imageName} {
+      allow read: if true;
+      allow write: if request.auth != null && request.auth.uid == userId
+                   && request.resource.size < 2 * 1024 * 1024
+                   && request.resource.contentType.matches('image/.*');
+    }
+  }
+}

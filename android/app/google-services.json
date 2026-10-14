@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "322803029275",
+    "project_id": "zuvex-4710f",
+    "storage_bucket": "zuvex-4710f.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:322803029275:android:4e8dabc0370aa56d79efbe",
+        "android_client_info": {
+          "package_name": "com.zuvex.app"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyBMWmo621ABqMIAHDyH_I_LdQoTDjyH8Vk"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}
