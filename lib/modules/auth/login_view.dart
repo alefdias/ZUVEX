@@ -5,12 +5,13 @@ import '../../app/theme.dart';
 import '../../data/services/auth_service.dart';
 import '../../widgets/zuvex_logo.dart';
 
-/// Tela de login do ZUVEX.
-///
-/// Fluxo:
-///   - Se biometria está ativa → mostra botão de impressão digital
-///   - 1ª vez ou biometria desativada → botão "Entrar com Google"
-///   - Opção de e-mail/senha sempre disponível
+/// Tela de Login e Cadastro do ZUVEX.
+/// Suporta:
+///   - E-mail e Senha (Entrar e Criar Conta)
+///   - Google Sign-In
+///   - Recuperação de senha
+///   - Biometria (se configurada)
+///   - Modo visitante
 class LoginView extends StatefulWidget {
   const LoginView({super.key});
 
@@ -19,7 +20,16 @@ class LoginView extends StatefulWidget {
 }
 
 class _LoginViewState extends State<LoginView> {
+  final _formKey = GlobalKey<FormState>();
+  final _emailController = TextEditingController();
+  final _passwordController = TextEditingController();
+  final _confirmPasswordController = TextEditingController();
+  final _nameController = TextEditingController();
+
+  bool _isSignUp = false;
   bool _isLoading = false;
+  bool _obscurePassword = true;
+  bool _obscureConfirmPassword = true;
   bool _biometricAvailable = false;
   bool _biometricEnabled = false;
   String _error = '';
@@ -28,12 +38,20 @@ class _LoginViewState extends State<LoginView> {
   void initState() {
     super.initState();
     _checkBiometric();
-    // Se já logado, vai direto para home
     if (AuthService.currentUser != null) {
       WidgetsBinding.instance.addPostFrameCallback((_) {
         Get.offAllNamed(AppRoutes.home);
       });
     }
+  }
+
+  @override
+  void dispose() {
+    _emailController.dispose();
+    _passwordController.dispose();
+    _confirmPasswordController.dispose();
+    _nameController.dispose();
+    super.dispose();
   }
 
   Future<void> _checkBiometric() async {
@@ -44,59 +62,239 @@ class _LoginViewState extends State<LoginView> {
         _biometricAvailable = available;
         _biometricEnabled = enabled;
       });
-      // Se biometria está ativa, dispara automaticamente ao abrir
-      if (available && enabled) {
+      if (available && enabled && !_isSignUp) {
         _loginWithBiometrics();
       }
     }
   }
 
-  // ── Login com impressão digital ───────────────────────────────────────────
-  Future<void> _loginWithBiometrics() async {
-    setState(() { _isLoading = true; _error = ''; });
+  // ── Login / Cadastro com E-mail e Senha ────────────────────────────────────
+  Future<void> _submitEmailAuth() async {
+    if (!_formKey.currentState!.validate()) return;
 
-    final ok = await AuthService.authenticateWithBiometrics();
-    if (!ok) {
-      if (mounted) setState(() { _isLoading = false; _error = 'Biometria não confirmada.'; });
+    final email = _emailController.text.trim();
+    final password = _passwordController.text;
+
+    if (_isSignUp && password != _confirmPasswordController.text) {
+      setState(() {
+        _error = 'As senhas não coincidem.';
+      });
       return;
     }
 
-    // Tenta reconectar silenciosamente ao Google (token ainda válido)
-    final silentOk = await AuthService.silentGoogleSignIn();
-    if (!mounted) return;
+    setState(() {
+      _isLoading = true;
+      _error = '';
+    });
 
-    if (silentOk) {
-      Get.offAllNamed(AppRoutes.home);
-    } else {
-      // Token expirou — pede login Google normal
-      setState(() { _isLoading = false; _error = 'Sessão expirada. Faça login com Google novamente.'; });
-      await _loginWithGoogle();
+    try {
+      if (_isSignUp) {
+        final cred = await AuthService.createAccount(email, password);
+        if (_nameController.text.trim().isNotEmpty) {
+          await cred.user?.updateDisplayName(_nameController.text.trim());
+        }
+        Get.snackbar(
+          'Conta criada!',
+          'Bem-vindo ao ZUVEX!',
+          backgroundColor: AppColors.success.withValues(alpha: 0.9),
+          colorText: Colors.white,
+          snackPosition: SnackPosition.BOTTOM,
+          margin: const EdgeInsets.all(16),
+        );
+      } else {
+        await AuthService.signInWithEmail(email, password);
+      }
+
+      if (mounted) {
+        if (_biometricAvailable && !_biometricEnabled) {
+          _promptEnableBiometric();
+        } else {
+          Get.offAllNamed(AppRoutes.home);
+        }
+      }
+    } catch (e) {
+      if (mounted) {
+        setState(() {
+          _error = e.toString().replaceAll('Exception: ', '');
+        });
+      }
+    } finally {
+      if (mounted) {
+        setState(() {
+          _isLoading = false;
+        });
+      }
     }
   }
 
-  // ── Login com Google (fluxo completo) ────────────────────────────────────
+  // ── Login com Google ──────────────────────────────────────────────────────
   Future<void> _loginWithGoogle() async {
-    setState(() { _isLoading = true; _error = ''; });
+    setState(() {
+      _isLoading = true;
+      _error = '';
+    });
 
     try {
       final cred = await AuthService.signInWithGoogle();
       if (cred == null) {
-        if (mounted) setState(() { _isLoading = false; });
+        if (mounted) setState(() => _isLoading = false);
         return;
       }
 
-      // Primeira vez: pergunta se quer ativar biometria
-      if (mounted && _biometricAvailable && !_biometricEnabled) {
-        _promptEnableBiometric();
-      } else {
-        if (mounted) Get.offAllNamed(AppRoutes.home);
+      if (mounted) {
+        if (_biometricAvailable && !_biometricEnabled) {
+          _promptEnableBiometric();
+        } else {
+          Get.offAllNamed(AppRoutes.home);
+        }
       }
     } catch (e) {
-      if (mounted) setState(() { _isLoading = false; _error = e.toString(); });
+      if (mounted) {
+        setState(() {
+          _error = e.toString().replaceAll('Exception: ', '');
+        });
+      }
+    } finally {
+      if (mounted) {
+        setState(() {
+          _isLoading = false;
+        });
+      }
     }
   }
 
-  // ── Pergunta se quer ativar biometria (só na 1ª vez) ─────────────────────
+  // ── Login Biometria ───────────────────────────────────────────────────────
+  Future<void> _loginWithBiometrics() async {
+    setState(() {
+      _isLoading = true;
+      _error = '';
+    });
+
+    final ok = await AuthService.authenticateWithBiometrics();
+    if (!ok) {
+      if (mounted) {
+        setState(() {
+          _isLoading = false;
+          _error = 'Biometria não confirmada.';
+        });
+      }
+      return;
+    }
+
+    final silentOk = await AuthService.silentGoogleSignIn();
+    if (!mounted) return;
+
+    if (silentOk || AuthService.currentUser != null) {
+      Get.offAllNamed(AppRoutes.home);
+    } else {
+      setState(() {
+        _isLoading = false;
+        _error = 'Sessão expirada. Entre com seu e-mail ou Google.';
+      });
+    }
+  }
+
+  // ── Modal de Esqueci Minha Senha ──────────────────────────────────────────
+  void _showForgotPasswordDialog() {
+    final resetEmailController = TextEditingController(text: _emailController.text);
+    bool isSending = false;
+
+    showDialog(
+      context: context,
+      builder: (ctx) => StatefulBuilder(
+        builder: (context, setDialogState) {
+          return AlertDialog(
+            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+            title: const Row(
+              children: [
+                Icon(Icons.lock_reset, color: AppColors.primary, size: 28),
+                SizedBox(width: 10),
+                Text('Recuperar Senha', style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
+              ],
+            ),
+            content: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                const Text(
+                  'Informe seu e-mail para receber as instruções de redefinição de senha:',
+                  style: TextStyle(fontSize: 13, height: 1.4),
+                ),
+                const SizedBox(height: 16),
+                TextField(
+                  controller: resetEmailController,
+                  keyboardType: TextInputType.emailAddress,
+                  decoration: InputDecoration(
+                    labelText: 'E-mail',
+                    prefixIcon: const Icon(Icons.email_outlined),
+                    border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
+                  ),
+                ),
+              ],
+            ),
+            actions: [
+              TextButton(
+                onPressed: isSending ? null : () => Navigator.pop(ctx),
+                child: const Text('Cancelar'),
+              ),
+              ElevatedButton(
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: AppColors.primary,
+                  foregroundColor: Colors.white,
+                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                ),
+                onPressed: isSending
+                    ? null
+                    : () async {
+                        final email = resetEmailController.text.trim();
+                        if (email.isEmpty || !email.contains('@')) {
+                          Get.snackbar(
+                            'Atenção',
+                            'Digite um e-mail válido.',
+                            backgroundColor: AppColors.error,
+                            colorText: Colors.white,
+                          );
+                          return;
+                        }
+
+                        setDialogState(() => isSending = true);
+                        try {
+                          await AuthService.sendPasswordReset(email);
+                          if (!ctx.mounted) return;
+                          Navigator.pop(ctx);
+                          Get.snackbar(
+                            'E-mail Enviado!',
+                            'Verifique sua caixa de entrada para redefinir a senha.',
+                            backgroundColor: AppColors.success,
+                            colorText: Colors.white,
+                            duration: const Duration(seconds: 4),
+                          );
+                        } catch (err) {
+                          setDialogState(() => isSending = false);
+                          Get.snackbar(
+                            'Erro',
+                            err.toString(),
+                            backgroundColor: AppColors.error,
+                            colorText: Colors.white,
+                          );
+                        }
+                      },
+                child: isSending
+                    ? const SizedBox(
+                        width: 18,
+                        height: 18,
+                        child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white),
+                      )
+                    : const Text('Enviar Link'),
+              ),
+            ],
+          );
+        },
+      ),
+    );
+  }
+
+  // ── Prompt Ativar Biometria ───────────────────────────────────────────────
   void _promptEnableBiometric() {
     showDialog(
       context: context,
@@ -111,7 +309,7 @@ class _LoginViewState extends State<LoginView> {
           ],
         ),
         content: const Text(
-          'Nas próximas vezes, você poderá entrar no ZUVEX usando apenas sua impressão digital — sem precisar fazer login novamente.',
+          'Deseja entrar no ZUVEX usando sua impressão digital nas próximas vezes?',
         ),
         actions: [
           TextButton(
@@ -150,159 +348,435 @@ class _LoginViewState extends State<LoginView> {
       body: SafeArea(
         child: Center(
           child: SingleChildScrollView(
-            padding: const EdgeInsets.symmetric(horizontal: 32, vertical: 24),
-            child: Column(
-              mainAxisAlignment: MainAxisAlignment.center,
-              children: [
-                // Logo ZUVEX
-                const ZuvexLogo(fontSize: 64),
-                const SizedBox(height: 12),
-                Text(
-                  'ZUVEX',
-                  style: TextStyle(
-                    fontSize: 32,
-                    fontWeight: FontWeight.w800,
-                    color: AppColors.primary,
-                    letterSpacing: 3,
-                  ),
-                ),
-                const SizedBox(height: 6),
-                Text(
-                  'Compre e venda perto de você.',
-                  style: TextStyle(
-                    fontSize: 14,
-                    color: isDark ? Colors.white60 : AppColors.textSecondary,
-                  ),
-                ),
-                const SizedBox(height: 48),
-
-                // ── Botão de Biometria (se ativa) ──────────────────────────
-                if (_biometricAvailable && _biometricEnabled) ...[
-                  _BiometricButton(
-                    onTap: _isLoading ? null : _loginWithBiometrics,
-                  ),
-                  const SizedBox(height: 20),
-                  TextButton(
-                    onPressed: _isLoading ? null : _loginWithGoogle,
-                    child: Text(
-                      'Usar outra conta',
-                      style: TextStyle(color: AppColors.primary, fontSize: 13),
+            padding: const EdgeInsets.symmetric(horizontal: 28, vertical: 20),
+            child: Form(
+              key: _formKey,
+              child: Column(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  // Logo ZUVEX
+                  const ZuvexLogo(fontSize: 54),
+                  const SizedBox(height: 8),
+                  Text(
+                    'ZUVEX',
+                    style: TextStyle(
+                      fontSize: 28,
+                      fontWeight: FontWeight.w800,
+                      color: AppColors.primary,
+                      letterSpacing: 3,
                     ),
                   ),
-                ] else ...[
-                  // ── Botão Google ──────────────────────────────────────────
-                  _GoogleSignInButton(
-                    onTap: _isLoading ? null : _loginWithGoogle,
-                    isLoading: _isLoading,
+                  const SizedBox(height: 4),
+                  Text(
+                    'Compre e venda perto de você.',
+                    style: TextStyle(
+                      fontSize: 13,
+                      color: isDark ? Colors.white60 : AppColors.textSecondary,
+                    ),
                   ),
-                ],
+                  const SizedBox(height: 28),
 
-                const SizedBox(height: 16),
-
-                // Erro
-                if (_error.isNotEmpty)
+                  // ── Seletor Entrar / Criar Conta ──────────────────────────
                   Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
                     decoration: BoxDecoration(
-                      color: AppColors.error.withValues(alpha: 0.1),
-                      borderRadius: BorderRadius.circular(10),
-                      border: Border.all(color: AppColors.error.withValues(alpha: 0.3)),
+                      color: isDark ? const Color(0xFF2B2D3A) : const Color(0xFFEAEBFA),
+                      borderRadius: BorderRadius.circular(16),
                     ),
+                    padding: const EdgeInsets.all(4),
                     child: Row(
                       children: [
-                        Icon(Icons.error_outline, color: AppColors.error, size: 18),
-                        const SizedBox(width: 8),
                         Expanded(
-                          child: Text(
-                            _error,
-                            style: TextStyle(color: AppColors.error, fontSize: 13),
+                          child: GestureDetector(
+                            onTap: () {
+                              if (_isSignUp) {
+                                setState(() {
+                                  _isSignUp = false;
+                                  _error = '';
+                                });
+                              }
+                            },
+                            child: AnimatedContainer(
+                              duration: const Duration(milliseconds: 200),
+                              padding: const EdgeInsets.symmetric(vertical: 12),
+                              decoration: BoxDecoration(
+                                color: !_isSignUp
+                                    ? AppColors.primary
+                                    : Colors.transparent,
+                                borderRadius: BorderRadius.circular(12),
+                                boxShadow: !_isSignUp
+                                    ? [
+                                        BoxShadow(
+                                          color: AppColors.primary.withValues(alpha: 0.3),
+                                          blurRadius: 8,
+                                          offset: const Offset(0, 2),
+                                        )
+                                      ]
+                                    : [],
+                              ),
+                              child: Text(
+                                'Entrar',
+                                textAlign: TextAlign.center,
+                                style: TextStyle(
+                                  fontWeight: FontWeight.w700,
+                                  fontSize: 14,
+                                  color: !_isSignUp
+                                      ? Colors.white
+                                      : (isDark ? Colors.white70 : AppColors.textSecondary),
+                                ),
+                              ),
+                            ),
+                          ),
+                        ),
+                        Expanded(
+                          child: GestureDetector(
+                            onTap: () {
+                              if (!_isSignUp) {
+                                setState(() {
+                                  _isSignUp = true;
+                                  _error = '';
+                                });
+                              }
+                            },
+                            child: AnimatedContainer(
+                              duration: const Duration(milliseconds: 200),
+                              padding: const EdgeInsets.symmetric(vertical: 12),
+                              decoration: BoxDecoration(
+                                color: _isSignUp
+                                    ? AppColors.primary
+                                    : Colors.transparent,
+                                borderRadius: BorderRadius.circular(12),
+                                boxShadow: _isSignUp
+                                    ? [
+                                        BoxShadow(
+                                          color: AppColors.primary.withValues(alpha: 0.3),
+                                          blurRadius: 8,
+                                          offset: const Offset(0, 2),
+                                        )
+                                      ]
+                                    : [],
+                              ),
+                              child: Text(
+                                'Criar Conta',
+                                textAlign: TextAlign.center,
+                                style: TextStyle(
+                                  fontWeight: FontWeight.w700,
+                                  fontSize: 14,
+                                  color: _isSignUp
+                                      ? Colors.white
+                                      : (isDark ? Colors.white70 : AppColors.textSecondary),
+                                ),
+                              ),
+                            ),
                           ),
                         ),
                       ],
                     ),
                   ),
+                  const SizedBox(height: 24),
 
-                const SizedBox(height: 32),
-                const _DividerOr(),
-                const SizedBox(height: 24),
+                  // ── Campo Nome (apenas Cadastro) ──────────────────────────
+                  if (_isSignUp) ...[
+                    TextFormField(
+                      controller: _nameController,
+                      keyboardType: TextInputType.name,
+                      textCapitalization: TextCapitalization.words,
+                      decoration: InputDecoration(
+                        labelText: 'Nome completo',
+                        hintText: 'Como quer ser chamado',
+                        prefixIcon: const Icon(Icons.person_outline),
+                        filled: true,
+                        fillColor: isDark ? const Color(0xFF262733) : Colors.white,
+                        border: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(14),
+                          borderSide: BorderSide(
+                            color: isDark ? Colors.white12 : Colors.black12,
+                          ),
+                        ),
+                        enabledBorder: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(14),
+                          borderSide: BorderSide(
+                            color: isDark ? Colors.white12 : Colors.black12,
+                          ),
+                        ),
+                      ),
+                      validator: (val) {
+                        if (_isSignUp && (val == null || val.trim().isEmpty)) {
+                          return 'Informe seu nome.';
+                        }
+                        return null;
+                      },
+                    ),
+                    const SizedBox(height: 14),
+                  ],
 
-                // ── Acesso rápido como visitante ──────────────────────────
-                OutlinedButton(
-                  style: OutlinedButton.styleFrom(
-                    minimumSize: const Size(double.infinity, 50),
-                    side: BorderSide(color: AppColors.primary.withValues(alpha: 0.5)),
-                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+                  // ── Campo E-mail ──────────────────────────────────────────
+                  TextFormField(
+                    controller: _emailController,
+                    keyboardType: TextInputType.emailAddress,
+                    autocorrect: false,
+                    decoration: InputDecoration(
+                      labelText: 'E-mail',
+                      hintText: 'seuemail@exemplo.com',
+                      prefixIcon: const Icon(Icons.email_outlined),
+                      filled: true,
+                      fillColor: isDark ? const Color(0xFF262733) : Colors.white,
+                      border: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(14),
+                        borderSide: BorderSide(
+                          color: isDark ? Colors.white12 : Colors.black12,
+                        ),
+                      ),
+                      enabledBorder: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(14),
+                        borderSide: BorderSide(
+                          color: isDark ? Colors.white12 : Colors.black12,
+                        ),
+                      ),
+                    ),
+                    validator: (val) {
+                      if (val == null || val.trim().isEmpty) {
+                        return 'Informe seu e-mail.';
+                      }
+                      if (!val.contains('@') || !val.contains('.')) {
+                        return 'E-mail inválido.';
+                      }
+                      return null;
+                    },
                   ),
-                  onPressed: () => Get.offAllNamed(AppRoutes.home),
-                  child: const Text('Navegar como visitante'),
-                ),
+                  const SizedBox(height: 14),
 
-                const SizedBox(height: 32),
-                Text(
-                  'Ao entrar, você concorda com nossos\nTermos de Uso e Política de Privacidade.',
-                  textAlign: TextAlign.center,
-                  style: TextStyle(
-                    fontSize: 11,
-                    color: isDark ? Colors.white38 : AppColors.textSecondary,
-                    height: 1.5,
+                  // ── Campo Senha ───────────────────────────────────────────
+                  TextFormField(
+                    controller: _passwordController,
+                    obscureText: _obscurePassword,
+                    decoration: InputDecoration(
+                      labelText: 'Senha',
+                      hintText: _isSignUp ? 'Mínimo 6 caracteres' : 'Sua senha',
+                      prefixIcon: const Icon(Icons.lock_outline),
+                      suffixIcon: IconButton(
+                        icon: Icon(
+                          _obscurePassword ? Icons.visibility_off : Icons.visibility,
+                          size: 20,
+                        ),
+                        onPressed: () {
+                          setState(() => _obscurePassword = !_obscurePassword);
+                        },
+                      ),
+                      filled: true,
+                      fillColor: isDark ? const Color(0xFF262733) : Colors.white,
+                      border: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(14),
+                        borderSide: BorderSide(
+                          color: isDark ? Colors.white12 : Colors.black12,
+                        ),
+                      ),
+                      enabledBorder: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(14),
+                        borderSide: BorderSide(
+                          color: isDark ? Colors.white12 : Colors.black12,
+                        ),
+                      ),
+                    ),
+                    validator: (val) {
+                      if (val == null || val.isEmpty) {
+                        return 'Informe sua senha.';
+                      }
+                      if (_isSignUp && val.length < 6) {
+                        return 'A senha deve ter no mínimo 6 caracteres.';
+                      }
+                      return null;
+                    },
                   ),
-                ),
-              ],
-            ),
-          ),
-        ),
-      ),
-    );
-  }
-}
 
-// ── Botão de Impressão Digital ─────────────────────────────────────────────
-class _BiometricButton extends StatelessWidget {
-  final VoidCallback? onTap;
-  const _BiometricButton({this.onTap});
+                  // ── Confirmar Senha (apenas Cadastro) ─────────────────────
+                  if (_isSignUp) ...[
+                    const SizedBox(height: 14),
+                    TextFormField(
+                      controller: _confirmPasswordController,
+                      obscureText: _obscureConfirmPassword,
+                      decoration: InputDecoration(
+                        labelText: 'Confirmar Senha',
+                        hintText: 'Repita sua senha',
+                        prefixIcon: const Icon(Icons.lock_reset),
+                        suffixIcon: IconButton(
+                          icon: Icon(
+                            _obscureConfirmPassword
+                                ? Icons.visibility_off
+                                : Icons.visibility,
+                            size: 20,
+                          ),
+                          onPressed: () {
+                            setState(() => _obscureConfirmPassword = !_obscureConfirmPassword);
+                          },
+                        ),
+                        filled: true,
+                        fillColor: isDark ? const Color(0xFF262733) : Colors.white,
+                        border: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(14),
+                          borderSide: BorderSide(
+                            color: isDark ? Colors.white12 : Colors.black12,
+                          ),
+                        ),
+                        enabledBorder: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(14),
+                          borderSide: BorderSide(
+                            color: isDark ? Colors.white12 : Colors.black12,
+                          ),
+                        ),
+                      ),
+                      validator: (val) {
+                        if (_isSignUp && (val == null || val.isEmpty)) {
+                          return 'Confirme sua senha.';
+                        }
+                        return null;
+                      },
+                    ),
+                  ],
 
-  @override
-  Widget build(BuildContext context) {
-    return GestureDetector(
-      onTap: onTap,
-      child: Container(
-        width: double.infinity,
-        padding: const EdgeInsets.symmetric(vertical: 20),
-        decoration: BoxDecoration(
-          gradient: LinearGradient(
-            colors: [AppColors.primary, AppColors.primary.withValues(alpha: 0.75)],
-          ),
-          borderRadius: BorderRadius.circular(18),
-          boxShadow: [
-            BoxShadow(
-              color: AppColors.primary.withValues(alpha: 0.35),
-              blurRadius: 20,
-              offset: const Offset(0, 8),
-            ),
-          ],
-        ),
-        child: Column(
-          children: [
-            const Icon(Icons.fingerprint, color: Colors.white, size: 52),
-            const SizedBox(height: 10),
-            const Text(
-              'Toque para entrar',
-              style: TextStyle(
-                color: Colors.white,
-                fontSize: 17,
-                fontWeight: FontWeight.w700,
-                letterSpacing: 0.3,
+                  // ── Esqueci minha senha (apenas Login) ────────────────────
+                  if (!_isSignUp) ...[
+                    Align(
+                      alignment: Alignment.centerRight,
+                      child: TextButton(
+                        onPressed: _isLoading ? null : _showForgotPasswordDialog,
+                        style: TextButton.styleFrom(
+                          padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 6),
+                        ),
+                        child: Text(
+                          'Esqueceu a senha?',
+                          style: TextStyle(
+                            fontSize: 13,
+                            color: AppColors.primary,
+                            fontWeight: FontWeight.w600,
+                          ),
+                        ),
+                      ),
+                    ),
+                  ] else ...[
+                    const SizedBox(height: 16),
+                  ],
+
+                  // ── Mensagem de Erro ──────────────────────────────────────
+                  if (_error.isNotEmpty) ...[
+                    Container(
+                      margin: const EdgeInsets.only(bottom: 14),
+                      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+                      decoration: BoxDecoration(
+                        color: AppColors.error.withValues(alpha: 0.1),
+                        borderRadius: BorderRadius.circular(12),
+                        border: Border.all(color: AppColors.error.withValues(alpha: 0.3)),
+                      ),
+                      child: Row(
+                        children: [
+                          const Icon(Icons.error_outline, color: AppColors.error, size: 18),
+                          const SizedBox(width: 8),
+                          Expanded(
+                            child: Text(
+                              _error,
+                              style: const TextStyle(color: AppColors.error, fontSize: 13),
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ],
+
+                  // ── Botão Principal (Entrar / Criar Conta) ─────────────────
+                  SizedBox(
+                    width: double.infinity,
+                    height: 52,
+                    child: ElevatedButton(
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: AppColors.primary,
+                        foregroundColor: Colors.white,
+                        elevation: 2,
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(14),
+                        ),
+                      ),
+                      onPressed: _isLoading ? null : _submitEmailAuth,
+                      child: _isLoading
+                          ? const SizedBox(
+                              width: 22,
+                              height: 22,
+                              child: CircularProgressIndicator(
+                                strokeWidth: 2.5,
+                                color: Colors.white,
+                              ),
+                            )
+                          : Text(
+                              _isSignUp ? 'Criar Conta Grátis' : 'Entrar na Conta',
+                              style: const TextStyle(
+                                fontSize: 16,
+                                fontWeight: FontWeight.bold,
+                                letterSpacing: 0.3,
+                              ),
+                            ),
+                    ),
+                  ),
+
+                  const SizedBox(height: 22),
+                  const _DividerOr(),
+                  const SizedBox(height: 20),
+
+                  // ── Botão Google ──────────────────────────────────────────
+                  _GoogleSignInButton(
+                    onTap: _isLoading ? null : _loginWithGoogle,
+                    isLoading: _isLoading,
+                  ),
+
+                  // ── Atalho Biometria (se ativa no aparelho) ───────────────
+                  if (_biometricAvailable && _biometricEnabled && !_isSignUp) ...[
+                    const SizedBox(height: 14),
+                    OutlinedButton.icon(
+                      style: OutlinedButton.styleFrom(
+                        minimumSize: const Size(double.infinity, 50),
+                        side: BorderSide(color: AppColors.primary.withValues(alpha: 0.5)),
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(14),
+                        ),
+                      ),
+                      icon: const Icon(Icons.fingerprint, color: AppColors.primary, size: 24),
+                      label: const Text(
+                        'Entrar com Impressão Digital',
+                        style: TextStyle(
+                          color: AppColors.primary,
+                          fontWeight: FontWeight.w600,
+                        ),
+                      ),
+                      onPressed: _isLoading ? null : _loginWithBiometrics,
+                    ),
+                  ],
+
+                  const SizedBox(height: 24),
+
+                  // ── Navegar como Visitante ────────────────────────────────
+                  TextButton.icon(
+                    onPressed: () => Get.offAllNamed(AppRoutes.home),
+                    icon: const Icon(Icons.arrow_forward, size: 16),
+                    label: const Text(
+                      'Continuar como visitante',
+                      style: TextStyle(
+                        fontSize: 14,
+                        fontWeight: FontWeight.w600,
+                      ),
+                    ),
+                  ),
+
+                  const SizedBox(height: 16),
+                  Text(
+                    'Ao continuar, você concorda com nossos\nTermos de Uso e Política de Privacidade.',
+                    textAlign: TextAlign.center,
+                    style: TextStyle(
+                      fontSize: 11,
+                      color: isDark ? Colors.white38 : AppColors.textSecondary,
+                      height: 1.5,
+                    ),
+                  ),
+                ],
               ),
             ),
-            const SizedBox(height: 4),
-            Text(
-              'Use sua impressão digital',
-              style: TextStyle(
-                color: Colors.white.withValues(alpha: 0.75),
-                fontSize: 12,
-              ),
-            ),
-          ],
+          ),
         ),
       ),
     );
@@ -321,65 +795,53 @@ class _GoogleSignInButton extends StatelessWidget {
 
     return GestureDetector(
       onTap: onTap,
-      child: AnimatedContainer(
-        duration: const Duration(milliseconds: 150),
+      child: Container(
         width: double.infinity,
-        padding: const EdgeInsets.symmetric(vertical: 15, horizontal: 20),
+        padding: const EdgeInsets.symmetric(vertical: 14, horizontal: 20),
         decoration: BoxDecoration(
-          color: isDark ? const Color(0xFF2A2B35) : Colors.white,
+          color: isDark ? const Color(0xFF262733) : Colors.white,
           borderRadius: BorderRadius.circular(14),
-          border: Border.all(color: AppColors.primary.withValues(alpha: 0.25)),
+          border: Border.all(
+            color: isDark ? Colors.white12 : const Color(0xFFDADCE0),
+          ),
           boxShadow: [
             BoxShadow(
-              color: Colors.black.withValues(alpha: 0.07),
-              blurRadius: 12,
-              offset: const Offset(0, 4),
+              color: Colors.black.withValues(alpha: 0.05),
+              blurRadius: 10,
+              offset: const Offset(0, 3),
             ),
           ],
         ),
-        child: isLoading
-            ? const Center(
-                child: SizedBox(
-                  width: 22,
-                  height: 22,
-                  child: CircularProgressIndicator(
-                    strokeWidth: 2.5,
-                    color: AppColors.primary,
-                  ),
-                ),
-              )
-            : Row(
-                mainAxisAlignment: MainAxisAlignment.center,
-                children: [
-                  // Ícone G do Google (SVG-like com Text)
-                  Container(
-                    width: 24,
-                    height: 24,
-                    decoration: const BoxDecoration(
-                      shape: BoxShape.circle,
-                    ),
-                    child: const Text(
-                      'G',
-                      textAlign: TextAlign.center,
-                      style: TextStyle(
-                        fontSize: 18,
-                        fontWeight: FontWeight.w700,
-                        color: Color(0xFF4285F4),
-                        height: 1.3,
-                      ),
-                    ),
-                  ),
-                  const SizedBox(width: 12),
-                  Text(
-                    'Continuar com Google',
-                    style: TextStyle(
-                      fontSize: 15,
-                      fontWeight: FontWeight.w600,
-                      color: isDark ? Colors.white : AppColors.graphite,
-                    ),
-                  ),
-                ],
+        child: Row(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Container(
+              width: 22,
+              height: 22,
+              alignment: Alignment.center,
+              decoration: const BoxDecoration(
+                shape: BoxShape.circle,
               ),
+              child: const Text(
+                'G',
+                style: TextStyle(
+                  fontSize: 18,
+                  fontWeight: FontWeight.w900,
+                  color: Color(0xFF4285F4),
+                ),
+              ),
+            ),
+            const SizedBox(width: 12),
+            Text(
+              'Continuar com Google',
+              style: TextStyle(
+                fontSize: 15,
+                fontWeight: FontWeight.w600,
+                color: isDark ? Colors.white : const Color(0xFF3C4043),
+              ),
+            ),
+          ],
+        ),
       ),
     );
   }
@@ -398,7 +860,7 @@ class _DividerOr extends StatelessWidget {
         Padding(
           padding: const EdgeInsets.symmetric(horizontal: 14),
           child: Text(
-            'ou',
+            'ou continue com',
             style: TextStyle(
               fontSize: 12,
               color: isDark ? Colors.white38 : AppColors.textSecondary,

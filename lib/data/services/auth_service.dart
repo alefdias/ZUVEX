@@ -175,6 +175,18 @@ class AuthService {
     }
   }
 
+  // ── REDEFINIR SENHA ─────────────────────────────────────────────────────────
+  static Future<void> sendPasswordReset(String email) async {
+    if (_auth == null) {
+      throw 'Firebase não está disponível nesta plataforma.';
+    }
+    try {
+      await _auth!.sendPasswordResetEmail(email: email);
+    } on FirebaseAuthException catch (e) {
+      throw _mapFirebaseError(e);
+    }
+  }
+
   // ── LOGOUT ─────────────────────────────────────────────────────────────────
   static Future<void> signOut() async {
     final futures = <Future>[];
