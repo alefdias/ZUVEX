@@ -355,24 +355,25 @@ class _LoginViewState extends State<LoginView> {
                 children: [
                   // Logo e Ícone ZUVEX
                   Container(
-                    width: 72,
-                    height: 72,
+                    width: 96,
+                    height: 96,
                     decoration: BoxDecoration(
-                      borderRadius: BorderRadius.circular(18),
+                      borderRadius: BorderRadius.circular(24),
                       boxShadow: [
                         BoxShadow(
-                          color: AppColors.primary.withValues(alpha: 0.25),
-                          blurRadius: 14,
-                          offset: const Offset(0, 4),
+                          color: AppColors.primary.withValues(alpha: 0.28),
+                          blurRadius: 16,
+                          offset: const Offset(0, 6),
                         ),
                       ],
                     ),
                     clipBehavior: Clip.antiAlias,
                     child: Image.asset(
                       'assets/images/app_icon.png',
+                      fit: BoxFit.cover,
                       errorBuilder: (_, __, ___) => Container(
                         color: AppColors.primary,
-                        child: const Icon(Icons.shopping_bag_rounded, color: Colors.white, size: 36),
+                        child: const Icon(Icons.shopping_bag_rounded, color: Colors.white, size: 48),
                       ),
                     ),
                   ),
