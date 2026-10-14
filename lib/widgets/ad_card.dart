@@ -64,7 +64,7 @@ class AdCard extends StatelessWidget {
                 AspectRatio(
                   aspectRatio: 1.28,
                   child: Hero(
-                    tag: 'ad_${ad.id}',
+                    tag: 'ad_${ad.id}_${key.hashCode}',
                     child: CachedNetworkImage(
                       imageUrl: ad.primaryImage,
                       fit: BoxFit.cover,
