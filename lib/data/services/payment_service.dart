@@ -17,7 +17,7 @@ abstract class IPaymentGateway {
   Future<PaymentStatus> checkPaymentStatus(String transactionId);
 }
 
-/// Serviço de Pagamento Integrado com a API BotaPix
+/// Serviço de Pagamento Integrado com a API BotaPix e Gerador Oficial BACEN
 /// Cria cobranças Pix reais e faz verificação em tempo real para liberação automática.
 class PaymentService implements IPaymentGateway {
   static final PaymentService instance = PaymentService._internal();
@@ -33,6 +33,54 @@ class PaymentService implements IPaymentGateway {
 
   static bool get isConfigured => botaPixApiKey.isNotEmpty;
 
+  /// Calcula o checksum CRC16-CCITT (0xFFFF) obrigatório pelo Banco Central do Brasil para Pix
+  static String calculateCrc16(String payload) {
+    int poly = 0x1021;
+    int crc = 0xFFFF;
+    final bytes = utf8.encode(payload);
+    for (final byte in bytes) {
+      crc ^= (byte << 8);
+      for (int i = 0; i < 8; i++) {
+        if ((crc & 0x8000) != 0) {
+          crc = ((crc << 1) ^ poly) & 0xFFFF;
+        } else {
+          crc = (crc << 1) & 0xFFFF;
+        }
+      }
+    }
+    return crc.toRadixString(16).toUpperCase().padLeft(4, '0');
+  }
+
+  /// Gera código Pix Copia e Cola Oficial (Padrão EMV BRCode do Banco Central do Brasil)
+  /// Reconhecido por todos os bancos (Nubank, Itaú, Bradesco, Inter, Caixa, BB, Santander, etc.)
+  static String generateBacenPix({
+    required String pixKey,
+    required String merchantName,
+    required String merchantCity,
+    required double amount,
+    String txid = '***',
+  }) {
+    final cleanName = merchantName.length > 25 ? merchantName.substring(0, 25) : merchantName;
+    final cleanCity = merchantCity.length > 15 ? merchantCity.substring(0, 15) : merchantCity;
+    final amountStr = amount.toStringAsFixed(2);
+
+    final maiGui = '0014br.gov.bcb.pix';
+    final maiKey = '01${pixKey.length.toString().padLeft(2, '0')}$pixKey';
+    final maiContent = '$maiGui$maiKey';
+    final mai = '26${maiContent.length.toString().padLeft(2, '0')}$maiContent';
+
+    final amt = '54${amountStr.length.toString().padLeft(2, '0')}$amountStr';
+    final nm = '59${cleanName.length.toString().padLeft(2, '0')}$cleanName';
+    final ct = '60${cleanCity.length.toString().padLeft(2, '0')}$cleanCity';
+    final ad = '62${(txid.length + 4).toString().padLeft(2, '0')}05${txid.length.toString().padLeft(2, '0')}$txid';
+
+    final raw = '000201${mai}520400005303986$amt'
+        '5802BR$nm$ct$ad'
+        '6304';
+    final crc = calculateCrc16(raw);
+    return '$raw$crc';
+  }
+
   @override
   Future<PaymentTransactionModel> createPixCharge({
     required AdModel ad,
@@ -45,7 +93,6 @@ class PaymentService implements IPaymentGateway {
     String? botaPixId;
     String? paymentUrl;
     String pixCopiaECola = '';
-    String pixQrCode = '';
 
     // 1. Tenta criar a cobrança real na API do BotaPix
     try {
@@ -85,10 +132,29 @@ class PaymentService implements IPaymentGateway {
         paymentUrl = data['payment_url'] as String?;
 
         if (paymentUrl != null && paymentUrl.isNotEmpty) {
-          pixCopiaECola = paymentUrl;
-          pixQrCode =
-              'https://api.qrserver.com/v1/create-qr-code/?size=260x260&data=${Uri.encodeComponent(paymentUrl)}';
-          debugPrint('✅ [BotaPix] Cobrança criada! URL: $paymentUrl | ID: $botaPixId');
+          debugPrint('🌐 [BotaPix] URL gerada: $paymentUrl');
+          // Tenta extrair o código Pix Copia e Cola real da página de pagamento do BotaPix
+          try {
+            final pageRes = await http.get(
+              Uri.parse(paymentUrl),
+              headers: {'User-Agent': 'Mozilla/5.0 (Mobile; Android)'},
+            ).timeout(const Duration(seconds: 5));
+
+            if (pageRes.statusCode == 200) {
+              final regExp = RegExp(r'(000201[A-Za-z0-9\.\_\-\/\*]+6304[A-Fa-f0-9]{4})');
+              final match = regExp.firstMatch(pageRes.body);
+              if (match != null) {
+                var extracted = match.group(1)!;
+                extracted = extracted.replaceAll(r'\/', '/');
+                if (extracted.startsWith('000201')) {
+                  pixCopiaECola = extracted;
+                  debugPrint('✅ [BotaPix] Código Pix Copia e Cola real extraído com sucesso!');
+                }
+              }
+            }
+          } catch (e) {
+            debugPrint('⚠️ [BotaPix] Não foi possível extrair EMV da página: $e');
+          }
         }
       } else {
         debugPrint('⚠️ [BotaPix] Resposta API: ${response.body}');
@@ -97,17 +163,23 @@ class PaymentService implements IPaymentGateway {
       debugPrint('⚠️ [BotaPix] Falha ao comunicar com API: $e');
     }
 
-    // 2. Se a chamada à API não retornou URL (ex: offline), gera fallback padrão
-    if (pixCopiaECola.isEmpty) {
-      final fallbackPix =
-          '00020126580014br.gov.bcb.pix0136devalefdias44@gmail.com'
-          '520400005303986540${plan.price.toStringAsFixed(2)}5802BR'
-          '5925ALEF DIAS ZUVEX6009PROMISSAO'
-          '62070503***6304${Random().nextInt(9999).toString().padLeft(4, '0')}';
-      pixCopiaECola = fallbackPix;
-      pixQrCode =
-          'https://api.qrserver.com/v1/create-qr-code/?size=260x260&data=${Uri.encodeComponent(fallbackPix)}';
+    // 2. Se a API BotaPix não retornou o código EMV válido, gera o Pix BACEN Oficial real com CRC16
+    if (pixCopiaECola.isEmpty || !pixCopiaECola.startsWith('000201')) {
+      debugPrint('ℹ️ [Pix] Gerando código Pix Oficial BACEN com CRC16 válido para $masterPixKey...');
+      pixCopiaECola = generateBacenPix(
+        pixKey: masterPixKey,
+        merchantName: 'ALEF DIAS ZUVEX',
+        merchantCity: 'PROMISSAO',
+        amount: plan.price,
+        txid: botaPixId != null ? 'ZUV${botaPixId.substring(0, min(10, botaPixId.length))}' : '***',
+      );
     }
+
+    // 3. O QR Code SEMPRE deve conter o código Pix oficial (iniciando em 000201), NUNCA uma URL HTTP
+    final pixQrCode =
+        'https://api.qrserver.com/v1/create-qr-code/?size=300x300&margin=10&data=${Uri.encodeComponent(pixCopiaECola)}';
+
+    debugPrint('📱 [Pix] Payload pronto para o banco: ${pixCopiaECola.substring(0, min(40, pixCopiaECola.length))}...');
 
     final txId = botaPixId ?? 'tx_${DateTime.now().millisecondsSinceEpoch}_${Random().nextInt(9999)}';
 
