@@ -219,6 +219,28 @@ class _ProfileViewState extends State<ProfileView> {
                                 ),
                               ),
                             ],
+                            if (HiveService.isPixVerified) ...[
+                              const SizedBox(width: 6),
+                              Container(
+                                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+                                decoration: BoxDecoration(
+                                  color: const Color(0xFF10B981).withValues(alpha: 0.15),
+                                  borderRadius: BorderRadius.circular(6),
+                                  border: Border.all(color: const Color(0xFF10B981).withValues(alpha: 0.3)),
+                                ),
+                                child: const Row(
+                                  mainAxisSize: MainAxisSize.min,
+                                  children: [
+                                    Icon(Icons.shield_rounded, size: 11, color: Color(0xFF10B981)),
+                                    SizedBox(width: 3),
+                                    Text(
+                                      'PIX VERIFICADO',
+                                      style: TextStyle(fontSize: 9, fontWeight: FontWeight.w900, color: Color(0xFF10B981)),
+                                    ),
+                                  ],
+                                ),
+                              ),
+                            ],
                           ],
                         ),
                         if (AuthService.currentUser == null) ...[

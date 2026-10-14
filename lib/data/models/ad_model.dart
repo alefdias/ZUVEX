@@ -90,6 +90,7 @@ class AdModel {
   final int viewsCount;
   final Map<String, dynamic> specificFields;
   final String? rejectionReason;
+  final bool isPixVerified;
 
   AdModel({
     required this.id,
@@ -115,6 +116,7 @@ class AdModel {
     this.viewsCount = 0,
     this.specificFields = const {},
     this.rejectionReason,
+    this.isPixVerified = false,
   });
 
   String get formattedPrice {
@@ -157,6 +159,7 @@ class AdModel {
       'viewsCount': viewsCount,
       'specificFields': specificFields,
       'rejectionReason': rejectionReason,
+      'isPixVerified': isPixVerified,
     };
   }
 
@@ -167,6 +170,7 @@ class AdModel {
       return DateTime.now();
     }
 
+    final adStatus = AdStatus.fromString(map['status']);
     return AdModel(
       id: id ?? map['id'] ?? '',
       userId: map['userId'] ?? '',
@@ -185,12 +189,13 @@ class AdModel {
       allowWhatsApp: map['allowWhatsApp'] ?? true,
       planId: map['planId'] ?? 'basic',
       isFeatured: map['isFeatured'] ?? false,
-      status: AdStatus.fromString(map['status']),
+      status: adStatus,
       createdAt: parseDate(map['createdAt']),
       expiresAt: map['expiresAt'] != null ? parseDate(map['expiresAt']) : null,
       viewsCount: (map['viewsCount'] as num?)?.toInt() ?? 0,
       specificFields: Map<String, dynamic>.from(map['specificFields'] ?? {}),
       rejectionReason: map['rejectionReason'],
+      isPixVerified: map['isPixVerified'] == true || adStatus == AdStatus.active,
     );
   }
 
@@ -218,6 +223,7 @@ class AdModel {
     int? viewsCount,
     Map<String, dynamic>? specificFields,
     String? rejectionReason,
+    bool? isPixVerified,
   }) {
     return AdModel(
       id: id ?? this.id,
@@ -243,6 +249,7 @@ class AdModel {
       viewsCount: viewsCount ?? this.viewsCount,
       specificFields: specificFields ?? this.specificFields,
       rejectionReason: rejectionReason ?? this.rejectionReason,
+      isPixVerified: isPixVerified ?? this.isPixVerified,
     );
   }
 }

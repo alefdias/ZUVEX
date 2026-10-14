@@ -255,11 +255,14 @@ class CreateAdController extends GetxController {
         durationDays: selectedPlan.value.durationDays,
       );
 
+      // Ativa o selo de Vendedor Verificado via Pix no perfil
+      await HiveService.setPixVerified(true);
+
       Get.defaultDialog(
         title: '🎉 Pagamento Aprovado!',
         titleStyle: const TextStyle(fontWeight: FontWeight.bold, color: Color(0xFF10B981)),
         middleText:
-            'O BotaPix confirmou o pagamento com sucesso!\nSeu anúncio já está no ar para toda a região!',
+            'O BotaPix confirmou o pagamento com sucesso!\nSeu anúncio já está no ar com o selo 🛡️ Vendedor Verificado via Pix!',
         middleTextStyle: const TextStyle(fontSize: 14, height: 1.4),
         confirm: ElevatedButton(
           style: ElevatedButton.styleFrom(backgroundColor: const Color(0xFF10B981)),

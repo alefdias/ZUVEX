@@ -458,30 +458,76 @@ class _ProductDetailViewState extends State<ProductDetailView> {
                       borderRadius: BorderRadius.circular(16),
                       border: Border.all(color: isDark ? AppColors.cardBorderDark : AppColors.cardBorderLight),
                     ),
-                    child: Row(
+                    child: Column(
                       children: [
-                        CircleAvatar(
-                          radius: 24,
-                          backgroundColor: AppColors.primaryLight,
-                          child: const Icon(Icons.person, color: AppColors.primary, size: 28),
-                        ),
-                        const SizedBox(width: 14),
-                        Expanded(
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              Text(ad.userName, style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 15)),
-                              const SizedBox(height: 2),
-                              Text(
-                                'Anunciante na ZUVEX',
-                                style: TextStyle(
-                                  fontSize: 12,
-                                  color: isDark ? AppColors.textSecondaryDark : AppColors.textSecondaryLight,
-                                ),
+                        Row(
+                          children: [
+                            CircleAvatar(
+                              radius: 24,
+                              backgroundColor: AppColors.primaryLight,
+                              child: const Icon(Icons.person, color: AppColors.primary, size: 28),
+                            ),
+                            const SizedBox(width: 14),
+                            Expanded(
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  Row(
+                                    children: [
+                                      Flexible(
+                                        child: Text(
+                                          ad.userName,
+                                          style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 15),
+                                          maxLines: 1,
+                                          overflow: TextOverflow.ellipsis,
+                                        ),
+                                      ),
+                                      if (ad.isPixVerified) ...[
+                                        const SizedBox(width: 6),
+                                        const Icon(Icons.verified_rounded, size: 16, color: Color(0xFF10B981)),
+                                      ],
+                                    ],
+                                  ),
+                                  const SizedBox(height: 2),
+                                  Text(
+                                    'Anunciante na ZUVEX',
+                                    style: TextStyle(
+                                      fontSize: 12,
+                                      color: isDark ? AppColors.textSecondaryDark : AppColors.textSecondaryLight,
+                                    ),
+                                  ),
+                                ],
                               ),
-                            ],
-                          ),
+                            ),
+                          ],
                         ),
+                        if (ad.isPixVerified) ...[
+                          const SizedBox(height: 12),
+                          Container(
+                            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+                            decoration: BoxDecoration(
+                              color: const Color(0xFF10B981).withValues(alpha: 0.1),
+                              borderRadius: BorderRadius.circular(10),
+                              border: Border.all(color: const Color(0xFF10B981).withValues(alpha: 0.25)),
+                            ),
+                            child: const Row(
+                              children: [
+                                Icon(Icons.shield_rounded, color: Color(0xFF10B981), size: 18),
+                                SizedBox(width: 8),
+                                Expanded(
+                                  child: Text(
+                                    'Vendedor Verificado via Pix (Conta bancária autenticada)',
+                                    style: TextStyle(
+                                      fontSize: 11.5,
+                                      fontWeight: FontWeight.w700,
+                                      color: Color(0xFF10B981),
+                                    ),
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                        ],
                       ],
                     ),
                   ),

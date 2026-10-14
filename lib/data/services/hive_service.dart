@@ -37,6 +37,11 @@ class HiveService {
   static String get email => _pBox.get('email', defaultValue: '') as String;
   static String get avatarPath =>
       _pBox.get('avatarPath', defaultValue: '') as String;
+  static bool get isPixVerified =>
+      _pBox.get('isPixVerified', defaultValue: false) as bool;
+
+  static Future<void> setPixVerified(bool val) async =>
+      await _pBox.put('isPixVerified', val);
 
   static Future<void> saveProfile({
     required String name,

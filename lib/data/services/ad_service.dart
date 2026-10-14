@@ -147,11 +147,12 @@ class AdService {
           'confirmedAt': FieldValue.serverTimestamp(),
         });
 
-        // 2. Ativar anúncio com expiração calculada
+        // 2. Ativar anúncio com expiração calculada e selo de Pix Verificado
         final adRef = _adsRef!.doc(adId);
         final expiresAt = DateTime.now().add(Duration(days: durationDays));
         batch.update(adRef, {
           'status': 'active',
+          'isPixVerified': true,
           'expiresAt': Timestamp.fromDate(expiresAt),
         });
 
