@@ -54,3 +54,4 @@ monitor-build.js
 setup-github-secret.js
 build_job*.log
 node_modules/
+*.apk
