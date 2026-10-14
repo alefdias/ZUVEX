@@ -50,3 +50,7 @@ windows/flutter/ephemeral/
 macos/Flutter/ephemeral/
 .flutter-plugins
 .flutter-plugins-dependencies
+monitor-build.js
+setup-github-secret.js
+build_job*.log
+node_modules/

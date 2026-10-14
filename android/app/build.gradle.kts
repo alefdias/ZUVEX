@@ -8,7 +8,8 @@ plugins {
 
 dependencies {
     // Firebase BoM — gerencia versões de todas as bibliotecas Firebase
-    implementation(platform("com.google.firebase:firebase-bom:35.0.0"))
+    // BoM 33.7.0 = última versão compatível com Kotlin 2.0.x (Flutter 3.29)
+    implementation(platform("com.google.firebase:firebase-bom:33.7.0"))
 
     // Bibliotecas Firebase usadas pelo ZUVEX (versões gerenciadas pelo BoM)
     implementation("com.google.firebase:firebase-auth")
@@ -20,7 +21,7 @@ dependencies {
 android {
     namespace = "com.zuvex.app"
     compileSdk = flutter.compileSdkVersion
-    ndkVersion = flutter.ndkVersion
+    ndkVersion = "27.0.12077973" // exigido pelos plugins Firebase/Flutter
 
     compileOptions {
         sourceCompatibility = JavaVersion.VERSION_17
@@ -29,6 +30,7 @@ android {
 
     kotlinOptions {
         jvmTarget = JavaVersion.VERSION_17.toString()
+        freeCompilerArgs += listOf("-Xskip-metadata-version-check")
     }
 
     defaultConfig {

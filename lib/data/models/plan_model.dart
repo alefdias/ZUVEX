@@ -43,11 +43,18 @@ class PlanModel {
     );
   }
 
-  // Planos Padrão ZUVEX
+  // ─────────────────────────────────────────────
+  // 🧪 MODO TESTE — preços R$ 0,01 para testar Pix
+  // Para restaurar valores reais, troque os preços abaixo:
+  //   basic    → 5.0   (R$ 5,00)
+  //   extended → 8.0   (R$ 8,00)
+  //   featured → 15.0  (R$ 15,00)
+  // ─────────────────────────────────────────────
+
   static const PlanModel basic = PlanModel(
     id: 'basic',
     name: 'Plano Básico',
-    price: 5.0,
+    price: 0.01, // REAL: 5.0
     durationDays: 30,
     isFeatured: false,
     description: 'Ideal para vendas rápidas no dia a dia.',
@@ -62,7 +69,7 @@ class PlanModel {
   static const PlanModel extended = PlanModel(
     id: 'extended',
     name: 'Plano Estendido',
-    price: 8.0,
+    price: 0.01, // REAL: 8.0
     durationDays: 60,
     isFeatured: false,
     description: 'Mais tempo para encontrar o comprador certo.',
@@ -77,7 +84,7 @@ class PlanModel {
   static const PlanModel featured = PlanModel(
     id: 'featured',
     name: 'Plano Destaque',
-    price: 15.0,
+    price: 0.01, // REAL: 15.0
     durationDays: 60,
     isFeatured: true,
     description: 'Máxima visibilidade no topo e com selo ouro.',
