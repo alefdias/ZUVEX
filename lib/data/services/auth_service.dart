@@ -119,8 +119,17 @@ class AuthService {
       return userCredential;
     } on FirebaseAuthException catch (e) {
       throw _mapFirebaseError(e);
+    } on PlatformException catch (e) {
+      final msg = e.message ?? '';
+      if (e.code == 'sign_in_failed' || msg.contains('10') || msg.contains('12500')) {
+        throw 'Google Sign-In: Chave SHA-1 não cadastrada no Firebase Console (Código 10). Cadastre a SHA-1 nas configurações do Firebase.';
+      }
+      if (e.code == 'network_error') {
+        throw 'Sem conexão com a internet para autenticar com o Google.';
+      }
+      throw 'Erro Google (${e.code}): ${e.message ?? e.toString()}';
     } catch (e) {
-      throw 'Erro ao fazer login com Google. Tente novamente.';
+      throw 'Erro ao fazer login com Google: $e';
     }
   }
 

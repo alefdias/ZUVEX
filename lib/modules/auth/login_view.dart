@@ -3,7 +3,6 @@ import 'package:get/get.dart';
 import '../../app/routes.dart';
 import '../../app/theme.dart';
 import '../../data/services/auth_service.dart';
-import '../../widgets/zuvex_logo.dart';
 
 /// Tela de Login e Cadastro do ZUVEX.
 /// Suporta:
@@ -354,16 +353,37 @@ class _LoginViewState extends State<LoginView> {
               child: Column(
                 mainAxisAlignment: MainAxisAlignment.center,
                 children: [
-                  // Logo ZUVEX
-                  const ZuvexLogo(fontSize: 54),
-                  const SizedBox(height: 8),
-                  Text(
-                    'ZUVEX',
+                  // Logo e Ícone ZUVEX
+                  Container(
+                    width: 72,
+                    height: 72,
+                    decoration: BoxDecoration(
+                      borderRadius: BorderRadius.circular(18),
+                      boxShadow: [
+                        BoxShadow(
+                          color: AppColors.primary.withValues(alpha: 0.25),
+                          blurRadius: 14,
+                          offset: const Offset(0, 4),
+                        ),
+                      ],
+                    ),
+                    clipBehavior: Clip.antiAlias,
+                    child: Image.asset(
+                      'assets/images/app_icon.png',
+                      errorBuilder: (_, __, ___) => Container(
+                        color: AppColors.primary,
+                        child: const Icon(Icons.shopping_bag_rounded, color: Colors.white, size: 36),
+                      ),
+                    ),
+                  ),
+                  const SizedBox(height: 12),
+                  const Text(
+                    'Zuvex',
                     style: TextStyle(
                       fontSize: 28,
                       fontWeight: FontWeight.w800,
                       color: AppColors.primary,
-                      letterSpacing: 3,
+                      letterSpacing: 0.5,
                     ),
                   ),
                   const SizedBox(height: 4),
