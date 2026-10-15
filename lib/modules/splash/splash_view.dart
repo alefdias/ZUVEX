@@ -3,7 +3,6 @@ import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 import '../../app/routes.dart';
 import '../../app/theme.dart';
-import '../../data/services/auth_service.dart';
 import '../../main.dart' show firebaseReady;
 
 class SplashView extends StatefulWidget {
@@ -33,23 +32,7 @@ class _SplashViewState extends State<SplashView> {
       final user = FirebaseAuth.instance.currentUser;
       if (mounted) {
         if (user != null) {
-          // Verifica se o usuário ativou a biometria
-          final isBioEnabled = await AuthService.isBiometricEnabled;
-          final isBioAvailable = await AuthService.isBiometricAvailable;
-
-          if (isBioEnabled && isBioAvailable) {
-            final ok = await AuthService.authenticateWithBiometrics(
-              reason: 'Confirme sua impressão digital para abrir o Zuvex',
-            );
-            if (ok) {
-              Get.offAllNamed(AppRoutes.home);
-            } else {
-              // Se cancelar biometria, vai para login
-              Get.offAllNamed(AppRoutes.login);
-            }
-          } else {
-            Get.offAllNamed(AppRoutes.home);
-          }
+          Get.offAllNamed(AppRoutes.home);
         } else {
           // Usuário NÃO conectado → pede login obrigatoriamente
           Get.offAllNamed(AppRoutes.login);

@@ -22,6 +22,8 @@ class _ProfileViewState extends State<ProfileView> {
   late String _name;
   late String _email;
   late String _avatarPath;
+  bool _biometricAvailable = false;
+  bool _biometricEnabled = false;
 
   bool get _isMasterAdmin =>
       AuthService.isMasterAdmin(_email) || AuthService.isCurrentMasterAdmin;
@@ -32,8 +34,14 @@ class _ProfileViewState extends State<ProfileView> {
     _loadProfile();
   }
 
-  void _loadProfile() {
+  Future<void> _loadProfile() async {
+    final available = await AuthService.isBiometricAvailable;
+    final enabled = await AuthService.isBiometricEnabled;
+    if (!mounted) return;
+
     setState(() {
+      _biometricAvailable = available;
+      _biometricEnabled = enabled;
       final isLogged = AuthService.currentUser != null;
       final googleName = AuthService.displayName;
       final googlePhoto = AuthService.photoUrl;
@@ -333,6 +341,45 @@ class _ProfileViewState extends State<ProfileView> {
                     _loadProfile();
                   },
                 ),
+                if (_biometricAvailable && AuthService.currentUser != null)
+                  _MenuEntry(
+                    icon: Icons.fingerprint_rounded,
+                    label: 'Acesso por Biometria',
+                    showChevron: false,
+                    trailing: Switch.adaptive(
+                      value: _biometricEnabled,
+                      activeColor: AppColors.primary,
+                      onChanged: (val) async {
+                        if (val) {
+                          final ok = await AuthService.authenticateWithBiometrics(
+                            reason: 'Confirme sua biometria para ativar',
+                          );
+                          if (ok) {
+                            await AuthService.setBiometricEnabled(true);
+                            setState(() => _biometricEnabled = true);
+                            Get.snackbar(
+                              'Biometria Ativada',
+                              'Acesso biométrico configurado com sucesso.',
+                              backgroundColor: AppColors.success,
+                              colorText: Colors.white,
+                              snackPosition: SnackPosition.BOTTOM,
+                            );
+                          }
+                        } else {
+                          await AuthService.setBiometricEnabled(false);
+                          setState(() => _biometricEnabled = false);
+                          Get.snackbar(
+                            'Biometria Desativada',
+                            'Acesso biométrico desativado.',
+                            backgroundColor: AppColors.textSecondaryDark,
+                            colorText: Colors.white,
+                            snackPosition: SnackPosition.BOTTOM,
+                          );
+                        }
+                      },
+                    ),
+                    onTap: () {},
+                  ),
                 _MenuEntry(
                   icon: Icons.policy_rounded,
                   label: 'Política de Privacidade (LGPD)',

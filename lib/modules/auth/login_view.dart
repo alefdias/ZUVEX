@@ -50,15 +50,7 @@ class _LoginViewState extends State<LoginView> {
       _biometricEnabled = enabled;
     });
 
-    // Se a biometria estiver ativa e disponível, ACIONA AUTOMATICAMENTE!
-    // Não precisa o usuário procurar botão.
-    if (available && enabled && !_isSignUp) {
-      Future.delayed(const Duration(milliseconds: 350), () {
-        if (mounted && !_isLoading) {
-          _loginWithBiometrics();
-        }
-      });
-    } else if (AuthService.currentUser != null) {
+    if (AuthService.currentUser != null) {
       WidgetsBinding.instance.addPostFrameCallback((_) {
         if (mounted) Get.offAllNamed(AppRoutes.home);
       });
@@ -112,11 +104,7 @@ class _LoginViewState extends State<LoginView> {
       }
 
       if (mounted) {
-        if (_biometricAvailable && !_biometricEnabled) {
-          _promptEnableBiometric();
-        } else {
-          Get.offAllNamed(AppRoutes.home);
-        }
+        Get.offAllNamed(AppRoutes.home);
       }
     } catch (e) {
       if (mounted) {
@@ -148,11 +136,7 @@ class _LoginViewState extends State<LoginView> {
       }
 
       if (mounted) {
-        if (_biometricAvailable && !_biometricEnabled) {
-          _promptEnableBiometric();
-        } else {
-          Get.offAllNamed(AppRoutes.home);
-        }
+        Get.offAllNamed(AppRoutes.home);
       }
     } catch (e) {
       if (mounted) {
@@ -307,51 +291,6 @@ class _LoginViewState extends State<LoginView> {
             ],
           );
         },
-      ),
-    );
-  }
-
-  // ── Prompt Ativar Biometria ───────────────────────────────────────────────
-  void _promptEnableBiometric() {
-    showDialog(
-      context: context,
-      barrierDismissible: false,
-      builder: (ctx) => AlertDialog(
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
-        title: const Row(
-          children: [
-            Icon(Icons.fingerprint, color: AppColors.primary, size: 28),
-            SizedBox(width: 10),
-            Text('Ativar Biometria?', style: TextStyle(fontSize: 18)),
-          ],
-        ),
-        content: const Text(
-          'Deseja entrar no ZUVEX usando sua impressão digital nas próximas vezes?',
-        ),
-        actions: [
-          TextButton(
-            onPressed: () {
-              Navigator.pop(ctx);
-              Get.offAllNamed(AppRoutes.home);
-            },
-            child: const Text('Agora não'),
-          ),
-          ElevatedButton.icon(
-            style: ElevatedButton.styleFrom(
-              backgroundColor: AppColors.primary,
-              foregroundColor: Colors.white,
-              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-            ),
-            icon: const Icon(Icons.fingerprint),
-            label: const Text('Ativar'),
-            onPressed: () async {
-              await AuthService.setBiometricEnabled(true);
-              if (!ctx.mounted) return;
-              Navigator.pop(ctx);
-              Get.offAllNamed(AppRoutes.home);
-            },
-          ),
-        ],
       ),
     );
   }

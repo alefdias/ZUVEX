@@ -56,3 +56,4 @@ build_job*.log
 *.apk
 /ZUVEX WEB/
 /ZUVEZ WEB/
+node_modules/

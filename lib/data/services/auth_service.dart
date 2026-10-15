@@ -63,6 +63,19 @@ class AuthService {
     await prefs.setBool(_keyBiometricEnabled, enabled);
   }
 
+  // ── Registra se o diálogo de biometria já foi apresentado ─────────────────
+  static const _keyBiometricAsked = 'zuvex_biometric_asked';
+
+  static Future<bool> get wasBiometricAsked async {
+    final prefs = await SharedPreferences.getInstance();
+    return prefs.getBool(_keyBiometricAsked) ?? false;
+  }
+
+  static Future<void> setBiometricAsked(bool asked) async {
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setBool(_keyBiometricAsked, asked);
+  }
+
   // ── Salva e-mail do último usuário logado (para biometria) ─────────────────
   static Future<void> _saveLastEmail(String email) async {
     final prefs = await SharedPreferences.getInstance();

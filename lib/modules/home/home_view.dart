@@ -17,8 +17,134 @@ import '../../data/services/ad_service.dart';
 import '../../data/services/firebase_service.dart';
 import 'home_controller.dart';
 
-class HomeView extends StatelessWidget {
+import '../../data/services/auth_service.dart';
+
+class HomeView extends StatefulWidget {
   const HomeView({super.key});
+
+  @override
+  State<HomeView> createState() => _HomeViewState();
+}
+
+class _HomeViewState extends State<HomeView> {
+  @override
+  void initState() {
+    super.initState();
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      _checkBiometricActivationPrompt();
+    });
+  }
+
+  Future<void> _checkBiometricActivationPrompt() async {
+    final user = AuthService.currentUser;
+    if (user == null) return;
+
+    final available = await AuthService.isBiometricAvailable;
+    final enabled = await AuthService.isBiometricEnabled;
+    final asked = await AuthService.wasBiometricAsked;
+
+    if (available && !enabled && !asked) {
+      await AuthService.setBiometricAsked(true);
+      await Future.delayed(const Duration(milliseconds: 1200));
+      if (!mounted) return;
+
+      final isDark = Theme.of(context).brightness == Brightness.dark;
+      showModalBottomSheet(
+        context: context,
+        isScrollControlled: true,
+        backgroundColor: Colors.transparent,
+        builder: (ctx) => Container(
+          padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 20),
+          decoration: BoxDecoration(
+            color: isDark ? AppColors.surfaceDark : Colors.white,
+            borderRadius: const BorderRadius.vertical(top: Radius.circular(24)),
+          ),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Container(
+                width: 44,
+                height: 4,
+                margin: const EdgeInsets.only(bottom: 20),
+                decoration: BoxDecoration(
+                  color: isDark ? Colors.white24 : Colors.black12,
+                  borderRadius: BorderRadius.circular(2),
+                ),
+              ),
+              Container(
+                padding: const EdgeInsets.all(16),
+                decoration: BoxDecoration(
+                  color: AppColors.primary.withValues(alpha: 0.1),
+                  shape: BoxShape.circle,
+                ),
+                child: const Icon(Icons.fingerprint_rounded, size: 48, color: AppColors.primary),
+              ),
+              const SizedBox(height: 16),
+              const Text(
+                'Deseja ativar o acesso por Biometria?',
+                style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+                textAlign: TextAlign.center,
+              ),
+              const SizedBox(height: 8),
+              Text(
+                'Entre no ZUVEX com rapidez e total segurança usando sua impressão digital ou Face ID.',
+                textAlign: TextAlign.center,
+                style: TextStyle(
+                  fontSize: 14,
+                  color: isDark ? AppColors.textSecondaryDark : AppColors.textSecondaryLight,
+                ),
+              ),
+              const SizedBox(height: 24),
+              Row(
+                children: [
+                  Expanded(
+                    child: OutlinedButton(
+                      onPressed: () => Navigator.pop(ctx),
+                      style: OutlinedButton.styleFrom(
+                        padding: const EdgeInsets.symmetric(vertical: 14),
+                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                      ),
+                      child: const Text('Agora não'),
+                    ),
+                  ),
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: ElevatedButton(
+                      onPressed: () async {
+                        Navigator.pop(ctx);
+                        final ok = await AuthService.authenticateWithBiometrics(
+                          reason: 'Confirme sua biometria para ativar no ZUVEX',
+                        );
+                        if (ok) {
+                          await AuthService.setBiometricEnabled(true);
+                          Get.snackbar(
+                            'Biometria Ativada!',
+                            'Pronto! Você pode usar sua digital para acessar o ZUVEX.',
+                            backgroundColor: AppColors.success,
+                            colorText: Colors.white,
+                            snackPosition: SnackPosition.BOTTOM,
+                            margin: const EdgeInsets.all(16),
+                          );
+                        }
+                      },
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: AppColors.primary,
+                        foregroundColor: Colors.white,
+                        padding: const EdgeInsets.symmetric(vertical: 14),
+                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                      ),
+                      child: const Text('Ativar'),
+                    ),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 8),
+            ],
+          ),
+        ),
+      );
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
