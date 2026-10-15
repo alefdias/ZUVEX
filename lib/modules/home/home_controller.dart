@@ -91,22 +91,16 @@ class HomeController extends GetxController {
         cityId: selectedCity.value.id,
       ).listen(
         (list) {
-          if (list.isEmpty) {
-            // Em caso de banco inicial vazio, fornece os dados realistas de Promissão
-            ads.assignAll(AdService.getInitialMockAds());
-          } else {
-            ads.assignAll(list);
-          }
+          ads.assignAll(list);
           isLoading(false);
         },
         onError: (err) {
-          // Fallback para os anúncios de demonstração de Promissão
-          ads.assignAll(AdService.getInitialMockAds());
+          ads.clear();
           isLoading(false);
         },
       );
     } catch (_) {
-      ads.assignAll(AdService.getInitialMockAds());
+      ads.clear();
       isLoading(false);
     }
   }

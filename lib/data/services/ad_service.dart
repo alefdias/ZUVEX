@@ -3,6 +3,7 @@ import '../models/ad_model.dart';
 import '../models/city_model.dart';
 import '../models/payment_transaction_model.dart';
 import '../models/report_model.dart';
+import 'firebase_service.dart';
 import '../../main.dart' show firebaseReady;
 
 class AdService {
@@ -17,7 +18,7 @@ class AdService {
   // Stream ou Fetch de Anúncios Ativos
   static Stream<List<AdModel>> streamActiveAds({String? cityId, String? categoryId}) {
     if (_adsRef == null) {
-      return Stream.value(getInitialMockAds());
+      return Stream.value(<AdModel>[]);
     }
 
     Query query = _adsRef!.where('status', isEqualTo: 'active');
@@ -49,7 +50,7 @@ class AdService {
   // Meus Anúncios por Usuário
   static Stream<List<AdModel>> streamUserAds(String userId) {
     if (_adsRef == null) {
-      return Stream.value(getInitialMockAds());
+      return Stream.value(<AdModel>[]);
     }
     return _adsRef!
         .where('userId', isEqualTo: userId)
@@ -66,7 +67,7 @@ class AdService {
   // Obter Anúncio por ID
   static Future<AdModel?> getAdById(String adId) async {
     if (_adsRef == null) {
-      return getInitialMockAds().firstWhere((a) => a.id == adId, orElse: () => getInitialMockAds().first);
+      return null;
     }
     try {
       final doc = await _adsRef!.doc(adId).get();
@@ -93,7 +94,12 @@ class AdService {
       return 'ad_local_${DateTime.now().millisecondsSinceEpoch}';
     }
     final docRef = _adsRef!.doc();
-    final newAd = ad.copyWith(id: docRef.id);
+    List<String> uploadedImages = List.from(ad.images);
+    try {
+      uploadedImages = await FirebaseService.uploadAdImages(ad.images, docRef.id);
+    } catch (_) {}
+
+    final newAd = ad.copyWith(id: docRef.id, images: uploadedImages);
     await docRef.set(newAd.toMap());
     return docRef.id;
   }

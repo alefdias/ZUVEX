@@ -1,4 +1,3 @@
-import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 import 'package:iconsax/iconsax.dart';
@@ -7,6 +6,7 @@ import '../app/routes.dart';
 import '../app/theme.dart';
 import '../data/models/ad_model.dart';
 import '../modules/favorites/favorites_controller.dart';
+import 'ad_image_view.dart';
 
 class AdCard extends StatelessWidget {
   final AdModel ad;
@@ -65,22 +65,9 @@ class AdCard extends StatelessWidget {
                   aspectRatio: 1.28,
                   child: Hero(
                     tag: 'ad_${ad.id}_${key.hashCode}',
-                    child: CachedNetworkImage(
-                      imageUrl: ad.primaryImage,
+                    child: AdImageView(
+                      imageSource: ad.primaryImage,
                       fit: BoxFit.cover,
-                      placeholder: (context, url) => Container(
-                        color: isDark ? const Color(0xFF2D2F3E) : const Color(0xFFE5E7EB),
-                        child: const Center(
-                          child: CircularProgressIndicator(
-                            strokeWidth: 2,
-                            color: AppColors.primary,
-                          ),
-                        ),
-                      ),
-                      errorWidget: (context, url, error) => Container(
-                        color: isDark ? const Color(0xFF2D2F3E) : const Color(0xFFE5E7EB),
-                        child: const Icon(Icons.image_not_supported_outlined, color: Colors.grey),
-                      ),
                     ),
                   ),
                 ),

@@ -1,4 +1,3 @@
-import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 import 'package:iconsax/iconsax.dart';
@@ -11,6 +10,7 @@ import '../../data/models/category_model.dart';
 import '../../data/models/report_model.dart';
 import '../../data/services/ad_service.dart';
 import '../../data/services/firebase_service.dart';
+import '../../widgets/ad_image_view.dart';
 import '../favorites/favorites_controller.dart';
 
 class ProductDetailView extends StatefulWidget {
@@ -229,17 +229,9 @@ class _ProductDetailViewState extends State<ProductDetailView> {
                     itemCount: images.length,
                     onPageChanged: (i) => setState(() => _currentImageIndex = i),
                     itemBuilder: (context, index) {
-                      return CachedNetworkImage(
-                        imageUrl: images[index],
+                      return AdImageView(
+                        imageSource: images[index],
                         fit: BoxFit.cover,
-                        placeholder: (context, url) => Container(
-                          color: isDark ? const Color(0xFF2D2F3E) : const Color(0xFFE5E7EB),
-                          child: const Center(child: CircularProgressIndicator(color: AppColors.primary)),
-                        ),
-                        errorWidget: (context, url, error) => Container(
-                          color: isDark ? const Color(0xFF2D2F3E) : const Color(0xFFE5E7EB),
-                          child: const Icon(Icons.image_not_supported_outlined, size: 40, color: Colors.grey),
-                        ),
                       );
                     },
                   ),

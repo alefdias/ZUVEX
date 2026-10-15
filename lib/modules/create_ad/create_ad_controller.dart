@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 import 'package:image_picker/image_picker.dart';
 import '../../app/routes.dart';
+import '../../app/theme.dart';
 import '../../data/models/ad_model.dart';
 import '../../data/models/category_model.dart';
 import '../../data/models/city_model.dart';
@@ -55,8 +56,8 @@ class CreateAdController extends GetxController {
   @override
   void onInit() {
     super.onInit();
-    phoneController.text = '14998887766';
-    districtController.text = 'Centro';
+    phoneController.text = '';
+    districtController.text = '';
   }
 
   @override
@@ -70,7 +71,31 @@ class CreateAdController extends GetxController {
     _pollingTimer = null;
   }
 
-  Future<void> pickImages() async {
+  /// Tirar foto agora usando a Câmera
+  Future<void> pickImageFromCamera() async {
+    if (selectedImages.length >= 10) {
+      Get.snackbar('Limite atingido', 'Você já selecionou o limite máximo de 10 fotografias.');
+      return;
+    }
+
+    try {
+      final photo = await picker.pickImage(
+        source: ImageSource.camera,
+        imageQuality: 85,
+        maxWidth: 1200,
+        maxHeight: 1200,
+      );
+
+      if (photo != null) {
+        selectedImages.add(photo);
+      }
+    } catch (_) {
+      Get.snackbar('Erro', 'Não foi possível acessar a câmera do dispositivo.');
+    }
+  }
+
+  /// Escolher fotos da Galeria (Uploads)
+  Future<void> pickImagesFromGallery() async {
     if (selectedImages.length >= 10) {
       Get.snackbar('Limite atingido', 'Você já selecionou o limite máximo de 10 fotografias.');
       return;
@@ -78,7 +103,7 @@ class CreateAdController extends GetxController {
 
     try {
       final list = await picker.pickMultiImage(
-        imageQuality: 80,
+        imageQuality: 85,
         maxWidth: 1200,
         maxHeight: 1200,
       );
@@ -90,8 +115,13 @@ class CreateAdController extends GetxController {
       } else {
         selectedImages.addAll(list);
       }
-    } catch (_) {}
+    } catch (_) {
+      Get.snackbar('Erro', 'Não foi possível selecionar fotos da galeria.');
+    }
   }
+
+  /// Atalho compatível com chamadas legadas
+  Future<void> pickImages() async => pickImagesFromGallery();
 
   void removeImage(int index) {
     if (index >= 0 && index < selectedImages.length) {
@@ -134,8 +164,15 @@ class CreateAdController extends GetxController {
       return;
     }
 
-    if (phoneController.text.trim().length < 8) {
-      Get.snackbar('Telefone de contato', 'Informe um número de telefone válido.');
+    // Validação estrita de WhatsApp obrigatório
+    final rawPhone = phoneController.text.replaceAll(RegExp(r'\D'), '');
+    if (rawPhone.length < 10) {
+      Get.snackbar(
+        'WhatsApp Obrigatório',
+        'Informe o seu número de WhatsApp com DDD (mínimo 10 dígitos) para contato.',
+        backgroundColor: const Color(0xFFE11D48),
+        colorText: Colors.white,
+      );
       return;
     }
 
@@ -156,8 +193,8 @@ class CreateAdController extends GetxController {
       cityId: selectedCity.value.id,
       cityName: selectedCity.value.displayName,
       district: districtController.text.trim(),
-      contactPhone: phoneController.text.trim(),
-      allowWhatsApp: allowWhatsApp.value,
+      contactPhone: rawPhone,
+      allowWhatsApp: true,
       planId: selectedPlan.value.id,
       isFeatured: selectedPlan.value.isFeatured,
       status: AdStatus.draft,
@@ -171,6 +208,47 @@ class CreateAdController extends GetxController {
 
   void proceedToPlanSelection() {
     currentStep.value = 2; // Passo 2: Escolha de Plano
+  }
+
+  /// Salvar Anúncio como Rascunho para pagar e ativar depois
+  Future<void> saveDraftPayLater() async {
+    isSubmitting.value = true;
+    try {
+      final ad = createdAd.value;
+      if (ad == null) return;
+      final plan = selectedPlan.value;
+
+      final draftAd = ad.copyWith(
+        planId: plan.id,
+        isFeatured: plan.isFeatured,
+        status: AdStatus.draft,
+      );
+
+      final adId = await AdService.createAd(draftAd);
+      createdAd.value = draftAd.copyWith(id: adId);
+
+      Get.defaultDialog(
+        title: '📝 Rascunho Salvo!',
+        titleStyle: TextStyle(fontWeight: FontWeight.bold, color: AppColors.primary),
+        middleText:
+            'Seu anúncio foi salvo como rascunho com sucesso!\nVocê pode visualizá-lo e pagar o Pix para ativá-lo a qualquer momento em "Meus Anúncios".',
+        middleTextStyle: const TextStyle(fontSize: 14, height: 1.4),
+        confirm: ElevatedButton(
+          style: ElevatedButton.styleFrom(backgroundColor: AppColors.primary),
+          onPressed: () {
+            Get.back(); // fecha diálogo
+            resetForm();
+            Get.offAllNamed(AppRoutes.home);
+          },
+          child: const Text('OK, Entendido', style: TextStyle(color: Colors.white)),
+        ),
+        barrierDismissible: false,
+      );
+    } catch (_) {
+      Get.snackbar('Erro', 'Não foi possível salvar o rascunho.');
+    } finally {
+      isSubmitting.value = false;
+    }
   }
 
   // Gera a cobrança Pix via BotaPix e inicia verificação automática
@@ -299,6 +377,7 @@ class CreateAdController extends GetxController {
     descriptionController.clear();
     priceController.clear();
     districtController.clear();
+    phoneController.clear();
     selectedImages.clear();
     dynamicFieldValues.clear();
     currentTransaction.value = null;

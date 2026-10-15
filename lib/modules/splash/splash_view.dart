@@ -3,8 +3,8 @@ import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 import '../../app/routes.dart';
 import '../../app/theme.dart';
+import '../../data/services/auth_service.dart';
 import '../../main.dart' show firebaseReady;
-import '../../widgets/zuvex_logo.dart';
 
 class SplashView extends StatefulWidget {
   const SplashView({super.key});
@@ -21,7 +21,7 @@ class _SplashViewState extends State<SplashView> {
   }
 
   Future<void> _checkSession() async {
-    await Future.delayed(const Duration(milliseconds: 1200));
+    await Future.delayed(const Duration(milliseconds: 1400));
 
     // Se Firebase não estiver pronto (modo demo desktop), abre tela de login
     if (!firebaseReady) {
@@ -33,8 +33,23 @@ class _SplashViewState extends State<SplashView> {
       final user = FirebaseAuth.instance.currentUser;
       if (mounted) {
         if (user != null) {
-          // Usuário já conectado → abre Home
-          Get.offAllNamed(AppRoutes.home);
+          // Verifica se o usuário ativou a biometria
+          final isBioEnabled = await AuthService.isBiometricEnabled;
+          final isBioAvailable = await AuthService.isBiometricAvailable;
+
+          if (isBioEnabled && isBioAvailable) {
+            final ok = await AuthService.authenticateWithBiometrics(
+              reason: 'Confirme sua impressão digital para abrir o Zuvex',
+            );
+            if (ok) {
+              Get.offAllNamed(AppRoutes.home);
+            } else {
+              // Se cancelar biometria, vai para login
+              Get.offAllNamed(AppRoutes.login);
+            }
+          } else {
+            Get.offAllNamed(AppRoutes.home);
+          }
         } else {
           // Usuário NÃO conectado → pede login obrigatoriamente
           Get.offAllNamed(AppRoutes.login);
@@ -55,11 +70,50 @@ class _SplashViewState extends State<SplashView> {
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
-            const ZuvexLogo(
-              fontSize: 36,
-              showSlogan: true,
+            // Novo Ícone Oficial do App ZUVEX
+            Container(
+              width: 100,
+              height: 100,
+              decoration: BoxDecoration(
+                borderRadius: BorderRadius.circular(24),
+                boxShadow: [
+                  BoxShadow(
+                    color: AppColors.primary.withValues(alpha: 0.35),
+                    blurRadius: 20,
+                    offset: const Offset(0, 8),
+                  ),
+                ],
+              ),
+              clipBehavior: Clip.antiAlias,
+              child: Image.asset(
+                'assets/images/app_icon.png',
+                fit: BoxFit.cover,
+                errorBuilder: (_, __, ___) => Container(
+                  color: AppColors.primary,
+                  child: const Icon(Icons.shopping_bag_rounded, color: Colors.white, size: 52),
+                ),
+              ),
             ),
-            const SizedBox(height: 48),
+            const SizedBox(height: 18),
+            const Text(
+              'Zuvex',
+              style: TextStyle(
+                fontSize: 32,
+                fontWeight: FontWeight.w900,
+                color: AppColors.primary,
+                letterSpacing: 0.5,
+              ),
+            ),
+            const SizedBox(height: 6),
+            Text(
+              'Compre e venda perto de você.',
+              style: TextStyle(
+                fontSize: 14,
+                color: isDark ? Colors.white70 : AppColors.textSecondary,
+                fontWeight: FontWeight.w500,
+              ),
+            ),
+            const SizedBox(height: 44),
             const SizedBox(
               width: 28,
               height: 28,

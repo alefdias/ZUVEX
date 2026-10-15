@@ -28,26 +28,30 @@ class ZuvexLogo extends StatelessWidget {
           crossAxisAlignment: CrossAxisAlignment.center,
           children: [
             Container(
-              padding: EdgeInsets.all(fontSize * 0.22),
+              width: fontSize * 1.35,
+              height: fontSize * 1.35,
               decoration: BoxDecoration(
-                gradient: const LinearGradient(
-                  colors: [AppColors.primary, Color(0xFF7052E6)],
-                  begin: Alignment.topLeft,
-                  end: Alignment.bottomRight,
-                ),
                 borderRadius: BorderRadius.circular(fontSize * 0.35),
                 boxShadow: [
                   BoxShadow(
-                    color: AppColors.primary.withValues(alpha: 0.3),
+                    color: AppColors.primary.withValues(alpha: 0.28),
                     blurRadius: 8,
                     offset: const Offset(0, 3),
                   ),
                 ],
               ),
-              child: Icon(
-                Icons.radar_rounded, // Ícone de proximidade ("Perto de você")
-                size: fontSize * 0.85,
-                color: Colors.white,
+              clipBehavior: Clip.antiAlias,
+              child: Image.asset(
+                'assets/images/app_icon.png',
+                fit: BoxFit.cover,
+                errorBuilder: (_, __, ___) => Container(
+                  color: AppColors.primary,
+                  child: Icon(
+                    Icons.shopping_bag_rounded,
+                    size: fontSize * 0.85,
+                    color: Colors.white,
+                  ),
+                ),
               ),
             ),
             SizedBox(width: fontSize * 0.35),

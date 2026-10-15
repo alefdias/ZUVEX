@@ -1,3 +1,4 @@
+import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:get/get.dart';
@@ -200,7 +201,7 @@ class _Step0Form extends StatelessWidget {
           Row(
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
-              const Text('5. Fotos (Até 10) *', style: TextStyle(fontWeight: FontWeight.w700, fontSize: 15)),
+              const Text('5. Fotos do Anúncio (Até 10) *', style: TextStyle(fontWeight: FontWeight.w700, fontSize: 15)),
               Obx(() => Text('${ctrl.selectedImages.length}/10 adicionadas', style: const TextStyle(fontSize: 12, color: AppColors.primary, fontWeight: FontWeight.w600))),
             ],
           ),
@@ -211,27 +212,56 @@ class _Step0Form extends StatelessWidget {
               runSpacing: 8,
               children: [
                 ...ctrl.selectedImages.asMap().entries.map((entry) {
+                  final isCover = entry.key == 0;
                   return Stack(
                     children: [
                       Container(
                         width: 75,
                         height: 75,
                         decoration: BoxDecoration(
-                          color: AppColors.primaryLight,
+                          color: isDark ? AppColors.surfaceDark : AppColors.white,
                           borderRadius: BorderRadius.circular(12),
-                          border: Border.all(color: AppColors.primary),
+                          border: Border.all(
+                            color: isCover ? AppColors.primary : (isDark ? AppColors.cardBorderDark : AppColors.cardBorderLight),
+                            width: isCover ? 2 : 1,
+                          ),
                         ),
-                        child: const Icon(Icons.image_rounded, color: AppColors.primary),
+                        clipBehavior: Clip.antiAlias,
+                        child: Image.file(
+                          File(entry.value.path),
+                          fit: BoxFit.cover,
+                          errorBuilder: (_, __, ___) => const Center(
+                            child: Icon(Icons.broken_image_outlined, color: Colors.grey),
+                          ),
+                        ),
                       ),
+                      if (isCover)
+                        Positioned(
+                          bottom: 0,
+                          left: 0,
+                          right: 0,
+                          child: Container(
+                            padding: const EdgeInsets.symmetric(vertical: 2),
+                            decoration: const BoxDecoration(
+                              color: AppColors.primary,
+                              borderRadius: BorderRadius.vertical(bottom: Radius.circular(10)),
+                            ),
+                            child: const Text(
+                              'CAPA',
+                              textAlign: TextAlign.center,
+                              style: TextStyle(color: Colors.white, fontSize: 9, fontWeight: FontWeight.w900, letterSpacing: 0.8),
+                            ),
+                          ),
+                        ),
                       Positioned(
                         top: 2,
                         right: 2,
                         child: GestureDetector(
                           onTap: () => ctrl.removeImage(entry.key),
                           child: const CircleAvatar(
-                            radius: 10,
-                            backgroundColor: AppColors.error,
-                            child: Icon(Icons.close, size: 12, color: Colors.white),
+                            radius: 11,
+                            backgroundColor: Colors.black87,
+                            child: Icon(Icons.close, size: 13, color: Colors.white),
                           ),
                         ),
                       ),
@@ -240,21 +270,24 @@ class _Step0Form extends StatelessWidget {
                 }),
                 if (ctrl.selectedImages.length < 10)
                   GestureDetector(
-                    onTap: () => ctrl.pickImages(),
+                    onTap: () => _showPhotoSourceBottomSheet(context, ctrl),
                     child: Container(
                       width: 75,
                       height: 75,
                       decoration: BoxDecoration(
                         color: isDark ? AppColors.surfaceDark : AppColors.white,
                         borderRadius: BorderRadius.circular(12),
-                        border: Border.all(color: isDark ? AppColors.dividerDark : AppColors.dividerLight),
+                        border: Border.all(
+                          color: AppColors.primary,
+                          width: 1.5,
+                        ),
                       ),
                       child: const Column(
                         mainAxisAlignment: MainAxisAlignment.center,
                         children: [
-                          Icon(Icons.add_a_photo_outlined, color: AppColors.primary, size: 24),
+                          Icon(Icons.add_a_photo_rounded, color: AppColors.primary, size: 24),
                           SizedBox(height: 3),
-                          Text('Foto', style: TextStyle(fontSize: 10, fontWeight: FontWeight.w600)),
+                          Text('Foto', style: TextStyle(fontSize: 10, fontWeight: FontWeight.w700, color: AppColors.primary)),
                         ],
                       ),
                     ),
@@ -283,35 +316,31 @@ class _Step0Form extends StatelessWidget {
           TextFormField(
             controller: ctrl.districtController,
             decoration: const InputDecoration(
-              labelText: 'Bairro',
+              labelText: 'Bairro *',
               hintText: 'Ex: Centro, Jardim das Flores, etc.',
             ),
           ),
           const SizedBox(height: 18),
 
-          // 7. Telefone de Contato e WhatsApp
-          const Text('7. Contato para Venda *', style: TextStyle(fontWeight: FontWeight.w700, fontSize: 15)),
+          // 7. Telefone de Contato e WhatsApp (OBRIGATÓRIO)
+          const Row(
+            children: [
+              Text('7. WhatsApp para Contato *', style: TextStyle(fontWeight: FontWeight.w700, fontSize: 15)),
+              SizedBox(width: 6),
+              Text('(Obrigatório)', style: TextStyle(color: AppColors.whatsapp, fontSize: 12, fontWeight: FontWeight.bold)),
+            ],
+          ),
           const SizedBox(height: 8),
           TextFormField(
             controller: ctrl.phoneController,
             keyboardType: TextInputType.phone,
             decoration: const InputDecoration(
-              labelText: 'Telefone / WhatsApp com DDD',
+              labelText: 'WhatsApp com DDD (somente números)',
               hintText: 'Ex: 14998765432',
-              prefixIcon: Icon(Icons.phone_outlined),
+              prefixIcon: Icon(Icons.phone_android_rounded, color: AppColors.whatsapp),
+              helperText: 'Compradores entrarão em contato direto com você pelo WhatsApp.',
             ),
           ),
-          const SizedBox(height: 10),
-          Obx(() {
-            return SwitchListTile(
-              contentPadding: EdgeInsets.zero,
-              title: const Text('Permitir contato direto via WhatsApp', style: TextStyle(fontSize: 14, fontWeight: FontWeight.w600)),
-              subtitle: const Text('Compradores verão o botão "Conversar com vendedor"', style: TextStyle(fontSize: 12)),
-              value: ctrl.allowWhatsApp.value,
-              activeColor: AppColors.whatsapp,
-              onChanged: (val) => ctrl.allowWhatsApp.value = val,
-            );
-          }),
           const SizedBox(height: 24),
 
           // Botão Continuar
@@ -373,6 +402,15 @@ class _Step1Preview extends StatelessWidget {
                 ),
               ),
             ],
+          ),
+          const SizedBox(height: 12),
+          SizedBox(
+            width: double.infinity,
+            child: OutlinedButton.icon(
+              icon: const Icon(Icons.bookmark_add_outlined, color: AppColors.primary),
+              label: const Text('Salvar Rascunho (Pagar Depois)', style: TextStyle(fontWeight: FontWeight.bold)),
+              onPressed: () => ctrl.saveDraftPayLater(),
+            ),
           ),
         ],
       ),
@@ -516,11 +554,91 @@ class _Step2Plans extends StatelessWidget {
               ),
             ],
           ),
+          const SizedBox(height: 12),
+          SizedBox(
+            width: double.infinity,
+            child: OutlinedButton.icon(
+              icon: const Icon(Icons.bookmark_add_outlined, color: AppColors.primary),
+              label: const Text('Salvar Rascunho (Pagar Depois)', style: TextStyle(fontWeight: FontWeight.bold)),
+              onPressed: () => ctrl.saveDraftPayLater(),
+            ),
+          ),
           const SizedBox(height: 30),
         ],
       ),
     );
   }
+}
+
+void _showPhotoSourceBottomSheet(BuildContext context, CreateAdController ctrl) {
+  final isDark = Theme.of(context).brightness == Brightness.dark;
+
+  showModalBottomSheet(
+    context: context,
+    backgroundColor: isDark ? AppColors.surfaceDark : Colors.white,
+    shape: const RoundedRectangleBorder(
+      borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+    ),
+    builder: (ctx) {
+      return SafeArea(
+        child: Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 20),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              const Text(
+                'Adicionar Foto ao Anúncio',
+                style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+              ),
+              const SizedBox(height: 6),
+              Text(
+                'Escolha se deseja tirar uma foto com a câmera ou carregar da galeria:',
+                style: TextStyle(
+                  fontSize: 13,
+                  color: isDark ? AppColors.textSecondaryDark : AppColors.textSecondaryLight,
+                ),
+              ),
+              const SizedBox(height: 16),
+              ListTile(
+                leading: Container(
+                  padding: const EdgeInsets.all(10),
+                  decoration: BoxDecoration(
+                    color: AppColors.primary.withValues(alpha: 0.12),
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                  child: const Icon(Icons.camera_alt_rounded, color: AppColors.primary),
+                ),
+                title: const Text('Tirar Foto Agora (Câmera)', style: TextStyle(fontWeight: FontWeight.w700)),
+                subtitle: const Text('Abra a câmera e tire uma foto na hora'),
+                onTap: () {
+                  Navigator.pop(ctx);
+                  ctrl.pickImageFromCamera();
+                },
+              ),
+              const SizedBox(height: 8),
+              ListTile(
+                leading: Container(
+                  padding: const EdgeInsets.all(10),
+                  decoration: BoxDecoration(
+                    color: const Color(0xFF10B981).withValues(alpha: 0.12),
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                  child: const Icon(Icons.photo_library_rounded, color: Color(0xFF10B981)),
+                ),
+                title: const Text('Escolher da Galeria (Uploads)', style: TextStyle(fontWeight: FontWeight.w700)),
+                subtitle: const Text('Selecione fotos salvas no seu aparelho'),
+                onTap: () {
+                  Navigator.pop(ctx);
+                  ctrl.pickImagesFromGallery();
+                },
+              ),
+            ],
+          ),
+        ),
+      );
+    },
+  );
 }
 
 class _Step3Payment extends StatelessWidget {

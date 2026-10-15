@@ -36,11 +36,28 @@ class _LoginViewState extends State<LoginView> {
   @override
   void initState() {
     super.initState();
-    _checkBiometric();
+    _initAuthSession();
+  }
+
+  Future<void> _initAuthSession() async {
+    final available = await AuthService.isBiometricAvailable;
+    final enabled = await AuthService.isBiometricEnabled;
+    if (!mounted) return;
+
+    setState(() {
+      _biometricAvailable = available;
+      _biometricEnabled = enabled;
+    });
+
     if (AuthService.currentUser != null) {
-      WidgetsBinding.instance.addPostFrameCallback((_) {
-        Get.offAllNamed(AppRoutes.home);
-      });
+      if (available && enabled && !_isSignUp) {
+        // Solicita a biometria cadastrada
+        await _loginWithBiometrics();
+      } else {
+        WidgetsBinding.instance.addPostFrameCallback((_) {
+          if (mounted) Get.offAllNamed(AppRoutes.home);
+        });
+      }
     }
   }
 
@@ -51,20 +68,6 @@ class _LoginViewState extends State<LoginView> {
     _confirmPasswordController.dispose();
     _nameController.dispose();
     super.dispose();
-  }
-
-  Future<void> _checkBiometric() async {
-    final available = await AuthService.isBiometricAvailable;
-    final enabled = await AuthService.isBiometricEnabled;
-    if (mounted) {
-      setState(() {
-        _biometricAvailable = available;
-        _biometricEnabled = enabled;
-      });
-      if (available && enabled && !_isSignUp) {
-        _loginWithBiometrics();
-      }
-    }
   }
 
   // ── Login / Cadastro com E-mail e Senha ────────────────────────────────────
