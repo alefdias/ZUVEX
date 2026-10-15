@@ -102,6 +102,17 @@ class PaymentService implements IPaymentGateway {
     final amountInCents = max(100, (plan.price * 100).round());
     final externalRef = 'zuvex_ad_${ad.id}_${DateTime.now().millisecondsSinceEpoch}';
 
+    final clientName = ad.userName.trim().isNotEmpty ? ad.userName.trim() : 'Usuário ZUVEX';
+    final clientPhone = ad.contactPhone.trim().isNotEmpty ? ad.contactPhone.trim() : '';
+    final clientEmail = userEmail.trim().isNotEmpty
+        ? userEmail.trim()
+        : (ad.userEmail.trim().isNotEmpty ? ad.userEmail.trim() : masterPixKey);
+
+    // Formata descrição rica para identificação visual imediata no dashboard da BotaPix
+    final phoneInfo = clientPhone.isNotEmpty ? ' | Tel: $clientPhone' : '';
+    final desc = 'ZUVEX | $clientName$phoneInfo | $clientEmail - ${plan.name} (${ad.title})';
+    final cleanDesc = desc.length > 250 ? desc.substring(0, 250) : desc;
+
     String? botaPixId;
     String? paymentUrl;
     String pixCopiaECola = '';
@@ -121,17 +132,22 @@ class PaymentService implements IPaymentGateway {
             body: jsonEncode({
               'amount': amountInCents,
               'external_reference': externalRef,
-              'description': 'ZUVEX - ${plan.name} (${ad.title})',
+              'description': cleanDesc,
               'expiration': 3600, // 1 hora de validade
               'customer': {
-                'name': ad.userName.isNotEmpty ? ad.userName : 'Cliente ZUVEX',
-                'email': userEmail.isNotEmpty ? userEmail : masterPixKey,
+                'name': clientName,
+                'email': clientEmail,
+                if (clientPhone.isNotEmpty) 'phone': clientPhone,
               },
               'metadata': {
                 'ad_id': ad.id,
-                'plan_id': plan.id,
-                'user_id': ad.userId,
                 'ad_title': ad.title,
+                'plan_id': plan.id,
+                'plan_name': plan.name,
+                'user_id': ad.userId,
+                'user_name': clientName,
+                'user_email': clientEmail,
+                'user_phone': clientPhone,
               },
             }),
           )
