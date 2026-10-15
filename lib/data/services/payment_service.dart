@@ -31,6 +31,10 @@ class PaymentService implements IPaymentGateway {
   /// Chave Pix Master padrão de recebimento
   static const String masterPixKey = 'devalefdias44@gmail.com';
 
+  /// User-Agent padrão para evitar bloqueio do Cloudflare
+  static const String userAgent =
+      'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36';
+
   static bool get isConfigured => botaPixApiKey.isNotEmpty;
 
   /// Calcula o checksum CRC16-CCITT (0xFFFF) obrigatório pelo Banco Central do Brasil para Pix
@@ -63,20 +67,26 @@ class PaymentService implements IPaymentGateway {
     final cleanName = merchantName.length > 25 ? merchantName.substring(0, 25) : merchantName;
     final cleanCity = merchantCity.length > 15 ? merchantCity.substring(0, 15) : merchantCity;
     final amountStr = amount.toStringAsFixed(2);
+    final cleanTxid = (txid.isEmpty || txid == '***') ? '***' : txid.replaceAll(RegExp(r'[^a-zA-Z0-9]'), '');
+    final finalTxid = cleanTxid.length > 25 ? cleanTxid.substring(0, 25) : cleanTxid;
 
-    final maiGui = '0014br.gov.bcb.pix';
+    // GUI oficial do Banco Central: BR.GOV.BCB.PIX em maiúsculo
+    final maiGui = '0014BR.GOV.BCB.PIX';
     final maiKey = '01${pixKey.length.toString().padLeft(2, '0')}$pixKey';
     final maiContent = '$maiGui$maiKey';
     final mai = '26${maiContent.length.toString().padLeft(2, '0')}$maiContent';
 
+    // 010212 = Ponto de Iniciação: QR Code Estático com valor pré-definido
+    final poi = '010212';
+    final mcc = '52040000';
+    final curr = '5303986'; // Real Brasileiro
     final amt = '54${amountStr.length.toString().padLeft(2, '0')}$amountStr';
+    final ctry = '5802BR';
     final nm = '59${cleanName.length.toString().padLeft(2, '0')}$cleanName';
     final ct = '60${cleanCity.length.toString().padLeft(2, '0')}$cleanCity';
-    final ad = '62${(txid.length + 4).toString().padLeft(2, '0')}05${txid.length.toString().padLeft(2, '0')}$txid';
+    final ad = '62${(finalTxid.length + 4).toString().padLeft(2, '0')}05${finalTxid.length.toString().padLeft(2, '0')}$finalTxid';
 
-    final raw = '000201${mai}520400005303986$amt'
-        '5802BR$nm$ct$ad'
-        '6304';
+    final raw = '000201$poi$mai$mcc$curr$amt$ctry$nm$ct$ad' '6304';
     final crc = calculateCrc16(raw);
     return '$raw$crc';
   }
@@ -93,8 +103,9 @@ class PaymentService implements IPaymentGateway {
     String? botaPixId;
     String? paymentUrl;
     String pixCopiaECola = '';
+    String pixQrCode = '';
 
-    // 1. Tenta criar a cobrança real na API do BotaPix
+    // 1. Tenta criar a cobrança real na API do BotaPix (usando User-Agent para contornar Cloudflare)
     try {
       final response = await http
           .post(
@@ -102,6 +113,7 @@ class PaymentService implements IPaymentGateway {
             headers: {
               'Authorization': 'Bearer $botaPixApiKey',
               'Content-Type': 'application/json',
+              'User-Agent': userAgent,
               'Idempotency-Key': externalRef,
             },
             body: jsonEncode({
@@ -133,31 +145,45 @@ class PaymentService implements IPaymentGateway {
 
         if (paymentUrl != null && paymentUrl.isNotEmpty) {
           debugPrint('🌐 [BotaPix] URL gerada: $paymentUrl');
-          // Tenta extrair o código Pix Copia e Cola real da página de pagamento do BotaPix
+
+          // Busca a página de pagamento para extrair o código oficial do Banco Central
           try {
             final pageRes = await http.get(
               Uri.parse(paymentUrl),
-              headers: {'User-Agent': 'Mozilla/5.0 (Mobile; Android)'},
-            ).timeout(const Duration(seconds: 5));
+              headers: {
+                'User-Agent': userAgent,
+                'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8',
+              },
+            ).timeout(const Duration(seconds: 8));
 
             if (pageRes.statusCode == 200) {
-              final regExp = RegExp(r'(000201[A-Za-z0-9\.\_\-\/\*]+6304[A-Fa-f0-9]{4})');
-              final match = regExp.firstMatch(pageRes.body);
-              if (match != null) {
-                var extracted = match.group(1)!;
-                extracted = extracted.replaceAll(r'\/', '/');
-                if (extracted.startsWith('000201')) {
-                  pixCopiaECola = extracted;
-                  debugPrint('✅ [BotaPix] Código Pix Copia e Cola real extraído com sucesso!');
-                }
+              // Desescapa barras e aspas da página Inertia.js
+              final normalized = pageRes.body
+                  .replaceAll(r'\/', '/')
+                  .replaceAll('&quot;', '"');
+
+              // 1. Busca código Pix Copia e Cola Oficial
+              final pixMatch = RegExp(r'(000201[A-Za-z0-9\.\_\-\/\*]+6304[A-Fa-f0-9]{4})')
+                  .firstMatch(normalized);
+              if (pixMatch != null) {
+                pixCopiaECola = pixMatch.group(1)!;
+                debugPrint('✅ [BotaPix] Código Pix Copia e Cola Oficial extraído com sucesso!');
+              }
+
+              // 2. Busca imagem QR Code gerada pelo BotaPix / Efí Bank em base64
+              final qrMatch = RegExp(r'(data:image\/png;base64,[A-Za-z0-9+/=]+)')
+                  .firstMatch(normalized);
+              if (qrMatch != null) {
+                pixQrCode = qrMatch.group(1)!;
+                debugPrint('✅ [BotaPix] Imagem QR Code Base64 extraída com sucesso!');
               }
             }
           } catch (e) {
-            debugPrint('⚠️ [BotaPix] Não foi possível extrair EMV da página: $e');
+            debugPrint('⚠️ [BotaPix] Não foi possível extrair dados da página de pagamento: $e');
           }
         }
       } else {
-        debugPrint('⚠️ [BotaPix] Resposta API: ${response.body}');
+        debugPrint('⚠️ [BotaPix] Resposta API: ${response.statusCode} - ${response.body}');
       }
     } catch (e) {
       debugPrint('⚠️ [BotaPix] Falha ao comunicar com API: $e');
@@ -171,15 +197,17 @@ class PaymentService implements IPaymentGateway {
         merchantName: 'ALEF DIAS ZUVEX',
         merchantCity: 'PROMISSAO',
         amount: plan.price,
-        txid: botaPixId != null ? 'ZUV${botaPixId.substring(0, min(10, botaPixId.length))}' : '***',
+        txid: botaPixId != null ? 'ZUV${botaPixId.replaceAll(RegExp(r'[^a-zA-Z0-9]'), '')}' : '***',
       );
     }
 
-    // 3. O QR Code SEMPRE deve conter o código Pix oficial (iniciando em 000201), NUNCA uma URL HTTP
-    final pixQrCode =
-        'https://api.qrserver.com/v1/create-qr-code/?size=300x300&margin=10&data=${Uri.encodeComponent(pixCopiaECola)}';
+    // 3. Se a imagem do QR Code em base64 não foi obtida, gera a imagem a partir do Copia e Cola
+    if (pixQrCode.isEmpty) {
+      pixQrCode =
+          'https://api.qrserver.com/v1/create-qr-code/?size=300x300&margin=10&data=${Uri.encodeComponent(pixCopiaECola)}';
+    }
 
-    debugPrint('📱 [Pix] Payload pronto para o banco: ${pixCopiaECola.substring(0, min(40, pixCopiaECola.length))}...');
+    debugPrint('📱 [Pix] Payload pronto para o banco: ${pixCopiaECola.substring(0, min(50, pixCopiaECola.length))}...');
 
     final txId = botaPixId ?? 'tx_${DateTime.now().millisecondsSinceEpoch}_${Random().nextInt(9999)}';
 
@@ -223,6 +251,7 @@ class PaymentService implements IPaymentGateway {
             headers: {
               'Authorization': 'Bearer $botaPixApiKey',
               'Content-Type': 'application/json',
+              'User-Agent': userAgent,
             },
           )
           .timeout(const Duration(seconds: 8));

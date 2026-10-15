@@ -12,6 +12,7 @@ import '../../data/services/firebase_service.dart';
 import '../../data/services/hive_service.dart';
 import '../../data/services/payment_service.dart';
 import '../../widgets/ad_image_view.dart';
+import '../../widgets/pix_qr_view.dart';
 
 class MyAdsView extends StatefulWidget {
   const MyAdsView({super.key});
@@ -494,11 +495,10 @@ class _PixActivationSheetState extends State<_PixActivationSheet> {
                               BoxShadow(color: Colors.black.withValues(alpha: 0.08), blurRadius: 10),
                             ],
                           ),
-                          child: Image.network(
-                            tx.pixQrCode,
-                            width: 180,
-                            height: 180,
-                            errorBuilder: (_, __, ___) => const Icon(Icons.qr_code_2_rounded, size: 170, color: Colors.black87),
+                          child: PixQrView(
+                            qrCodeSource: tx.pixQrCode,
+                            pixCopiaECola: tx.pixCopiaECola,
+                            size: 180,
                           ),
                         ),
                         const SizedBox(height: 16),

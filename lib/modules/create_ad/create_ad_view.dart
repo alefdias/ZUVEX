@@ -7,6 +7,7 @@ import '../../app/theme.dart';
 import '../../data/models/category_model.dart';
 import '../../data/models/city_model.dart';
 import '../../widgets/ad_card.dart';
+import '../../widgets/pix_qr_view.dart';
 import 'create_ad_controller.dart';
 
 class CreateAdView extends StatelessWidget {
@@ -708,11 +709,10 @@ class _Step3Payment extends StatelessWidget {
                   BoxShadow(color: Colors.black.withValues(alpha: 0.08), blurRadius: 14, offset: const Offset(0, 4)),
                 ],
               ),
-              child: Image.network(
-                tx.pixQrCode,
-                width: 200,
-                height: 200,
-                errorBuilder: (_, __, ___) => const Icon(Icons.qr_code_2_rounded, size: 190, color: AppColors.graphite),
+              child: PixQrView(
+                qrCodeSource: tx.pixQrCode,
+                pixCopiaECola: tx.pixCopiaECola,
+                size: 200,
               ),
             ),
             const SizedBox(height: 16),
