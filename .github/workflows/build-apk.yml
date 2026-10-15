@@ -93,7 +93,7 @@ jobs:
             2. No celular: Configurações → Segurança → Fontes desconhecidas ✅
             3. Abra o arquivo APK para instalar
 
-            > ⚠️ **Modo TESTE** — preços em R$ 0,01 (BotaPix ativo)
+            > 💳 **BotaPix Integrado** — Pagamentos via Pix Dinâmico Oficial BotaPix / Efí Bank (BACEN)
           files: artifacts/*.apk
           draft: false
           prerelease: false
