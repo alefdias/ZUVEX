@@ -98,7 +98,8 @@ class PaymentService implements IPaymentGateway {
     required PlanModel plan,
     required String userEmail,
   }) async {
-    final amountInCents = (plan.price * 100).round();
+    // Garante que o valor enviado à BotaPix seja de pelo menos 100 centavos (R$ 1,00 - mínimo da API)
+    final amountInCents = max(100, (plan.price * 100).round());
     final externalRef = 'zuvex_ad_${ad.id}_${DateTime.now().millisecondsSinceEpoch}';
 
     String? botaPixId;
