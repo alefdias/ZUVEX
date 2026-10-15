@@ -58,14 +58,13 @@ jobs:
       - name: 🏗️ Build APK Release
         run: flutter build apk --release --no-tree-shake-icons
 
-      # 9. Extrair versão do pubspec e renomear APK
+      # 9. Renomear APK Oficial v1
       - name: 📝 Renomear APK Oficial
         run: |
-          VERSION=$(grep '^version:' pubspec.yaml | cut -d ' ' -f 2 | cut -d '+' -f 1)
           mkdir -p artifacts
-          cp build/app/outputs/flutter-apk/app-release.apk artifacts/ZUVEX-v${VERSION}.apk
-          echo "APP_TAG=v${VERSION}" >> $GITHUB_ENV
-          echo "APK_NAME=ZUVEX-v${VERSION}.apk" >> $GITHUB_ENV
+          cp build/app/outputs/flutter-apk/app-release.apk artifacts/ZUVEX-v1.apk
+          echo "APP_TAG=v1" >> $GITHUB_ENV
+          echo "APK_NAME=ZUVEX-v1.apk" >> $GITHUB_ENV
 
       # 10. Upload do APK como artifact
       - name: 📤 Upload APK
@@ -80,17 +79,17 @@ jobs:
         if: github.ref == 'refs/heads/main' && github.event_name == 'push'
         uses: softprops/action-gh-release@v2
         with:
-          tag_name: ${{ env.APP_TAG }}
-          name: "ZUVEX ${{ env.APP_TAG }}"
+          tag_name: v1
+          name: "ZUVEX v1"
           body: |
-            ## 📱 ZUVEX - Versão Oficial Disponível
+            ## 📱 ZUVEX v1 - Versão Oficial
 
-            **Versão:** ${{ env.APP_TAG }}
+            **Versão:** v1 (Lançamento Oficial)
             **Branch:** ${{ github.ref_name }}
             **Commit:** ${{ github.sha }}
 
             ### 📥 Como instalar:
-            1. Baixe o arquivo `ZUVEX-*.apk` abaixo
+            1. Baixe o arquivo `ZUVEX-v1.apk` abaixo
             2. No celular: autorize a instalação de fontes desconhecidas se solicitado
             3. Abra o arquivo APK para instalar ou atualizar
 
