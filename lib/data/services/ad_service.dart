@@ -167,6 +167,19 @@ class AdService {
     }
   }
 
+  // Stream de Transações Pix Reais para o Painel Administrativo
+  static Stream<List<PaymentTransactionModel>> streamTransactions() {
+    if (_transactionsRef == null) return const Stream.empty();
+    return _transactionsRef!
+        .orderBy('createdAt', descending: true)
+        .snapshots()
+        .map((snap) => snap.docs
+            .map((d) => PaymentTransactionModel.fromMap(
+                d.data() as Map<String, dynamic>,
+                id: d.id))
+            .toList());
+  }
+
   // Criar Denúncia de Anúncio
   static Future<void> createReport(ReportModel report) async {
     if (_reportsRef == null) return;

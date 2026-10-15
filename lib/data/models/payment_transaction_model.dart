@@ -57,6 +57,7 @@ class PaymentTransactionModel {
   final PaymentStatus status;
   final String pixQrCode;
   final String pixCopiaECola;
+  final String? userEmail;
   final String provider;
   final String? externalReference;
   final String? paymentUrl;
@@ -69,6 +70,7 @@ class PaymentTransactionModel {
     required this.adId,
     required this.adTitle,
     required this.userId,
+    this.userEmail,
     required this.planId,
     required this.planName,
     required this.amount,
@@ -83,6 +85,10 @@ class PaymentTransactionModel {
     this.confirmedAt,
   });
 
+  bool get isConfirmed => status == PaymentStatus.confirmed;
+  bool get isPending => status == PaymentStatus.pending;
+  bool get isExpired => status == PaymentStatus.expired;
+
   String get formattedAmount => 'R\$ ${amount.toStringAsFixed(2).replaceAll('.', ',')}';
 
   Map<String, dynamic> toMap() {
@@ -91,6 +97,7 @@ class PaymentTransactionModel {
       'adId': adId,
       'adTitle': adTitle,
       'userId': userId,
+      'userEmail': userEmail,
       'planId': planId,
       'planName': planName,
       'amount': amount,
@@ -118,6 +125,7 @@ class PaymentTransactionModel {
       adId: map['adId'] ?? '',
       adTitle: map['adTitle'] ?? 'Publicação de Anúncio',
       userId: map['userId'] ?? '',
+      userEmail: map['userEmail'],
       planId: map['planId'] ?? 'basic',
       planName: map['planName'] ?? 'Plano Básico',
       amount: (map['amount'] as num?)?.toDouble() ?? 5.0,

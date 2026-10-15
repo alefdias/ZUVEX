@@ -23,9 +23,18 @@ class PaymentService implements IPaymentGateway {
   static final PaymentService instance = PaymentService._internal();
   PaymentService._internal();
 
-  /// Credenciais da API BotaPix
-  static const String botaPixApiKey =
-      'btpx_5a17bdc85093c45ad64c995b8f3b4800969d1f36abc3eb9a3b7bb490';
+  /// URL do Backend Seguro ZUVEX (Node.js / Cloud Functions)
+  /// Caso configurado, todas as chamadas de pagamento e segredos ficam isolados no servidor.
+  static const String backendUrl = String.fromEnvironment(
+    'BACKEND_URL',
+    defaultValue: '',
+  );
+
+  /// Credenciais da API BotaPix (injetáveis via --dart-define para segurança)
+  static const String botaPixApiKey = String.fromEnvironment(
+    'BOTAPIX_API_KEY',
+    defaultValue: 'btpx_5a17bdc85093c45ad64c995b8f3b4800969d1f36abc3eb9a3b7bb490',
+  );
   static const String botaPixBaseUrl = 'https://botapix.com/api/v1';
 
   /// Chave Pix Master padrão de recebimento
@@ -35,7 +44,7 @@ class PaymentService implements IPaymentGateway {
   static const String userAgent =
       'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36';
 
-  static bool get isConfigured => botaPixApiKey.isNotEmpty;
+  static bool get isConfigured => backendUrl.isNotEmpty || botaPixApiKey.isNotEmpty;
 
   /// Calcula o checksum CRC16-CCITT (0xFFFF) obrigatório pelo Banco Central do Brasil para Pix
   static String calculateCrc16(String payload) {
@@ -117,6 +126,51 @@ class PaymentService implements IPaymentGateway {
     String? paymentUrl;
     String pixCopiaECola = '';
     String pixQrCode = '';
+
+    // 0. Se houver um backend seguro configurado, delega a geração para o servidor
+    if (backendUrl.isNotEmpty) {
+      try {
+        final resp = await http.post(
+          Uri.parse('$backendUrl/api/create-pix'),
+          headers: {'Content-Type': 'application/json'},
+          body: jsonEncode({
+            'adId': ad.id,
+            'adTitle': ad.title,
+            'planId': plan.id,
+            'planName': plan.name,
+            'amount': plan.price,
+            'userEmail': clientEmail,
+            'userName': clientName,
+            'contactPhone': clientPhone,
+            'durationDays': plan.durationDays,
+          }),
+        ).timeout(const Duration(seconds: 10));
+
+        if (resp.statusCode == 200) {
+          final resData = jsonDecode(resp.body);
+          final txId = resData['transactionId'] ?? externalRef;
+          final tx = PaymentTransactionModel(
+            id: txId,
+            adId: ad.id,
+            adTitle: ad.title,
+            userId: ad.userId,
+            userEmail: clientEmail,
+            planId: plan.id,
+            planName: plan.name,
+            amount: plan.price,
+            status: PaymentStatus.pending,
+            pixQrCode: resData['qrCodeUrl'] ?? '',
+            pixCopiaECola: resData['copyPaste'] ?? '',
+            externalReference: externalRef,
+            botaPixChargeId: txId,
+            createdAt: DateTime.now(),
+          );
+          return tx;
+        }
+      } catch (e) {
+        debugPrint('⚠️ [PaymentService] Backend seguro indisponível, usando fallback: $e');
+      }
+    }
 
     // 1. Tenta criar a cobrança real na API do BotaPix (usando User-Agent para contornar Cloudflare)
     try {
@@ -289,6 +343,25 @@ class PaymentService implements IPaymentGateway {
   Future<PaymentStatus> checkPaymentStatus(String chargeIdOrRef) async {
     if (chargeIdOrRef.isEmpty || chargeIdOrRef.startsWith('tx_')) {
       return PaymentStatus.pending;
+    }
+
+    // Se houver backend seguro configurado, consulta diretamente por ele
+    if (backendUrl.isNotEmpty) {
+      try {
+        final resp = await http.get(
+          Uri.parse('$backendUrl/api/status/$chargeIdOrRef'),
+        ).timeout(const Duration(seconds: 8));
+
+        if (resp.statusCode == 200) {
+          final data = jsonDecode(resp.body);
+          final status = (data['status'] as String?)?.toLowerCase();
+          if (status == 'confirmed' || status == 'paid') {
+            return PaymentStatus.confirmed;
+          } else if (status == 'expired' || status == 'cancelled') {
+            return PaymentStatus.expired;
+          }
+        }
+      } catch (_) {}
     }
 
     try {
