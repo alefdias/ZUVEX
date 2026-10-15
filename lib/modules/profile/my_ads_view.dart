@@ -15,7 +15,8 @@ import '../../widgets/ad_image_view.dart';
 import '../../widgets/pix_qr_view.dart';
 
 class MyAdsView extends StatefulWidget {
-  const MyAdsView({super.key});
+  final int initialIndex;
+  const MyAdsView({super.key, this.initialIndex = 0});
 
   @override
   State<MyAdsView> createState() => _MyAdsViewState();
@@ -27,7 +28,11 @@ class _MyAdsViewState extends State<MyAdsView> with SingleTickerProviderStateMix
   @override
   void initState() {
     super.initState();
-    _tabController = TabController(length: 5, vsync: this);
+    _tabController = TabController(
+      length: 5,
+      vsync: this,
+      initialIndex: widget.initialIndex.clamp(0, 4),
+    );
   }
 
   @override

@@ -3,6 +3,7 @@ import 'package:get/get.dart';
 import '../../app/routes.dart';
 import '../../app/theme.dart';
 import '../../data/services/auth_service.dart';
+import '../../data/services/hive_service.dart';
 
 /// Tela de Login e Cadastro do ZUVEX.
 /// Suporta:
@@ -49,15 +50,18 @@ class _LoginViewState extends State<LoginView> {
       _biometricEnabled = enabled;
     });
 
-    if (AuthService.currentUser != null) {
-      if (available && enabled && !_isSignUp) {
-        // Solicita a biometria cadastrada
-        await _loginWithBiometrics();
-      } else {
-        WidgetsBinding.instance.addPostFrameCallback((_) {
-          if (mounted) Get.offAllNamed(AppRoutes.home);
-        });
-      }
+    // Se a biometria estiver ativa e disponível, ACIONA AUTOMATICAMENTE!
+    // Não precisa o usuário procurar botão.
+    if (available && enabled && !_isSignUp) {
+      Future.delayed(const Duration(milliseconds: 350), () {
+        if (mounted && !_isLoading) {
+          _loginWithBiometrics();
+        }
+      });
+    } else if (AuthService.currentUser != null) {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (mounted) Get.offAllNamed(AppRoutes.home);
+      });
     }
   }
 
@@ -167,31 +171,42 @@ class _LoginViewState extends State<LoginView> {
 
   // ── Login Biometria ───────────────────────────────────────────────────────
   Future<void> _loginWithBiometrics() async {
+    if (_isLoading) return;
     setState(() {
       _isLoading = true;
       _error = '';
     });
 
-    final ok = await AuthService.authenticateWithBiometrics();
+    final ok = await AuthService.authenticateWithBiometrics(
+      reason: 'Confirme sua biometria para acessar sua conta ZUVEX',
+    );
+
+    if (!mounted) return;
+
     if (!ok) {
-      if (mounted) {
-        setState(() {
-          _isLoading = false;
-          _error = 'Biometria não confirmada.';
-        });
-      }
+      setState(() {
+        _isLoading = false;
+        _error = 'Biometria não confirmada. Toque no leitor ou entre com sua senha.';
+      });
       return;
     }
 
+    // Se confirmou a biometria com sucesso:
+    if (AuthService.currentUser != null) {
+      Get.offAllNamed(AppRoutes.home);
+      return;
+    }
+
+    // Tenta reconexão silenciosa com Google caso a conta use Google
     final silentOk = await AuthService.silentGoogleSignIn();
     if (!mounted) return;
 
-    if (silentOk || AuthService.currentUser != null) {
+    if (silentOk || AuthService.currentUser != null || HiveService.isProfileSetup) {
       Get.offAllNamed(AppRoutes.home);
     } else {
       setState(() {
         _isLoading = false;
-        _error = 'Sessão expirada. Entre com seu e-mail ou Google.';
+        _error = 'Informe seu e-mail e senha para validar sua conta.';
       });
     }
   }

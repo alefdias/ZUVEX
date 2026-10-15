@@ -272,18 +272,31 @@ class _ProfileViewState extends State<ProfileView> {
               items: [
                 _MenuEntry(
                   icon: Iconsax.box,
-                  label: 'Meus Anúncios',
-                  onTap: () => Get.to(() => const MyAdsView()),
+                  label: 'Meus Anúncios Publicados',
+                  onTap: () => Get.to(() => const MyAdsView(initialIndex: 0)),
+                ),
+                _MenuEntry(
+                  icon: Iconsax.document_text,
+                  label: 'Meus Rascunhos (Salvos para Pagar)',
+                  iconColor: Colors.amber,
+                  trailing: Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                    decoration: BoxDecoration(
+                      color: Colors.amber.withValues(alpha: 0.15),
+                      borderRadius: BorderRadius.circular(8),
+                      border: Border.all(color: Colors.amber.withValues(alpha: 0.3)),
+                    ),
+                    child: const Text(
+                      'Pagar e Ativar',
+                      style: TextStyle(fontSize: 10, fontWeight: FontWeight.w800, color: Colors.amber),
+                    ),
+                  ),
+                  onTap: () => Get.to(() => const MyAdsView(initialIndex: 2)),
                 ),
                 _MenuEntry(
                   icon: Iconsax.heart,
                   label: 'Favoritos Salvos',
                   onTap: () => Get.toNamed(AppRoutes.favorites),
-                ),
-                _MenuEntry(
-                  icon: Iconsax.card,
-                  label: 'Histórico de Planos e Pix',
-                  onTap: () => Get.to(() => const MyAdsView()),
                 ),
               ],
             ),
@@ -457,6 +470,10 @@ class _ProfileViewState extends State<ProfileView> {
                     ),
                   ),
                 ),
+                if (entry.trailing != null) ...[
+                  entry.trailing!,
+                  const SizedBox(width: 8),
+                ],
                 if (entry.showChevron)
                   Icon(
                     Iconsax.arrow_right_3,
@@ -540,6 +557,7 @@ class _MenuEntry {
   final Color? iconColor;
   final Color? labelColor;
   final bool showChevron;
+  final Widget? trailing;
 
   const _MenuEntry({
     required this.icon,
@@ -548,5 +566,6 @@ class _MenuEntry {
     this.iconColor,
     this.labelColor,
     this.showChevron = true,
+    this.trailing,
   });
 }

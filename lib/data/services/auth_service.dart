@@ -140,6 +140,10 @@ class AuthService {
     String reason = 'Use sua impressão digital para entrar no ZUVEX',
   }) async {
     try {
+      try {
+        await _localAuth.stopAuthentication();
+      } catch (_) {}
+
       final bool authenticated = await _localAuth.authenticate(
         localizedReason: reason,
         options: const AuthenticationOptions(
@@ -149,7 +153,7 @@ class AuthService {
         ),
       );
       return authenticated;
-    } on PlatformException {
+    } catch (e) {
       return false;
     }
   }

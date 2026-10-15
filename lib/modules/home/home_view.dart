@@ -11,6 +11,10 @@ import '../favorites/favorites_view.dart';
 import '../profile/profile_view.dart';
 import '../search/search_view.dart';
 import '../create_ad/create_ad_view.dart';
+import '../profile/my_ads_view.dart';
+import '../../data/models/ad_model.dart';
+import '../../data/services/ad_service.dart';
+import '../../data/services/firebase_service.dart';
 import 'home_controller.dart';
 
 class HomeView extends StatelessWidget {
@@ -363,6 +367,54 @@ class _HomeContent extends StatelessWidget {
                     ),
                   ],
                 ),
+              ),
+            ),
+
+            // Banner de Rascunhos Pendentes (se o usuário tiver algum rascunho salvo)
+            SliverToBoxAdapter(
+              child: StreamBuilder<List<AdModel>>(
+                stream: AdService.streamUserAds(FirebaseService.currentUid ?? ''),
+                builder: (context, snapshot) {
+                  final drafts = (snapshot.data ?? [])
+                      .where((a) => a.status == AdStatus.draft || a.status == AdStatus.pendingPayment)
+                      .toList();
+                  if (drafts.isEmpty) return const SizedBox.shrink();
+
+                  return Container(
+                    margin: const EdgeInsets.fromLTRB(16, 4, 16, 12),
+                    padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+                    decoration: BoxDecoration(
+                      color: Colors.amber.withValues(alpha: 0.12),
+                      borderRadius: BorderRadius.circular(14),
+                      border: Border.all(color: Colors.amber.withValues(alpha: 0.35)),
+                    ),
+                    child: Row(
+                      children: [
+                        const Icon(Icons.edit_note_rounded, color: Colors.amber, size: 24),
+                        const SizedBox(width: 10),
+                        Expanded(
+                          child: Text(
+                            drafts.length == 1
+                                ? 'Você tem 1 anúncio em rascunho.'
+                                : 'Você tem ${drafts.length} anúncios em rascunho.',
+                            style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 13),
+                          ),
+                        ),
+                        ElevatedButton(
+                          style: ElevatedButton.styleFrom(
+                            backgroundColor: Colors.amber,
+                            foregroundColor: Colors.black,
+                            elevation: 0,
+                            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                          ),
+                          onPressed: () => Get.to(() => const MyAdsView(initialIndex: 2)),
+                          child: const Text('Pagar e Ativar', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 12)),
+                        ),
+                      ],
+                    ),
+                  );
+                },
               ),
             ),
 

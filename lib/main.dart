@@ -7,6 +7,7 @@ import 'package:hive_flutter/hive_flutter.dart';
 import 'app/bindings.dart';
 import 'app/routes.dart';
 import 'app/theme.dart';
+import 'data/services/auth_service.dart';
 import 'firebase_options.dart';
 
 /// Flag global: Firebase inicializou com sucesso?
@@ -53,8 +54,74 @@ void main() async {
   runApp(const ZuvexApp());
 }
 
-class ZuvexApp extends StatelessWidget {
+class ZuvexApp extends StatefulWidget {
   const ZuvexApp({super.key});
+
+  @override
+  State<ZuvexApp> createState() => _ZuvexAppState();
+}
+
+class _ZuvexAppState extends State<ZuvexApp> with WidgetsBindingObserver {
+  bool _isAuthenticating = false;
+  DateTime? _lastPaused;
+
+  @override
+  void initState() {
+    super.initState();
+    WidgetsBinding.instance.addObserver(this);
+  }
+
+  @override
+  void dispose() {
+    WidgetsBinding.instance.removeObserver(this);
+    super.dispose();
+  }
+
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    if (state == AppLifecycleState.paused) {
+      _lastPaused = DateTime.now();
+    } else if (state == AppLifecycleState.resumed) {
+      _handleAppResume();
+    }
+  }
+
+  Future<void> _handleAppResume() async {
+    // Se ficou em segundo plano por menos de 2s (ex: troca de tela, permissão ou teclado), não bloqueia
+    if (_lastPaused != null && DateTime.now().difference(_lastPaused!).inSeconds < 2) {
+      return;
+    }
+    _lastPaused = null;
+
+    if (_isAuthenticating) return;
+
+    // Se o usuário já estiver na tela de Splash ou Login, deixa o fluxo dessas telas agir
+    final currentRoute = Get.currentRoute;
+    if (currentRoute == AppRoutes.splash || currentRoute == AppRoutes.login) {
+      return;
+    }
+
+    final user = AuthService.currentUser;
+    if (user == null) return;
+
+    final isBioEnabled = await AuthService.isBiometricEnabled;
+    final isBioAvailable = await AuthService.isBiometricAvailable;
+
+    if (isBioEnabled && isBioAvailable) {
+      _isAuthenticating = true;
+      try {
+        final ok = await AuthService.authenticateWithBiometrics(
+          reason: 'Confirme sua biometria para continuar no ZUVEX',
+        );
+        if (!ok) {
+          // Se cancelar a biometria ao voltar ao app, bloqueia e vai para a tela de login
+          Get.offAllNamed(AppRoutes.login);
+        }
+      } finally {
+        _isAuthenticating = false;
+      }
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
