@@ -58,13 +58,14 @@ jobs:
       - name: 🏗️ Build APK Release
         run: flutter build apk --release --no-tree-shake-icons
 
-      # 9. Renomear APK com data
-      - name: 📝 Renomear APK
+      # 9. Extrair versão do pubspec e renomear APK
+      - name: 📝 Renomear APK Oficial
         run: |
-          DATE=$(date +'%Y%m%d-%H%M')
+          VERSION=$(grep '^version:' pubspec.yaml | cut -d ' ' -f 2 | cut -d '+' -f 1)
           mkdir -p artifacts
-          cp build/app/outputs/flutter-apk/app-release.apk artifacts/ZUVEX-${DATE}.apk
-          echo "APK_NAME=ZUVEX-${DATE}.apk" >> $GITHUB_ENV
+          cp build/app/outputs/flutter-apk/app-release.apk artifacts/ZUVEX-v${VERSION}.apk
+          echo "APP_TAG=v${VERSION}" >> $GITHUB_ENV
+          echo "APK_NAME=ZUVEX-v${VERSION}.apk" >> $GITHUB_ENV
 
       # 10. Upload do APK como artifact
       - name: 📤 Upload APK
@@ -79,21 +80,21 @@ jobs:
         if: github.ref == 'refs/heads/main' && github.event_name == 'push'
         uses: softprops/action-gh-release@v2
         with:
-          tag_name: v${{ github.run_number }}
-          name: "ZUVEX v${{ github.run_number }}"
+          tag_name: ${{ env.APP_TAG }}
+          name: "ZUVEX ${{ env.APP_TAG }}"
           body: |
-            ## 📱 ZUVEX - Nova versão gerada automaticamente
+            ## 📱 ZUVEX - Versão Oficial Disponível
 
-            **Build:** #${{ github.run_number }}
+            **Versão:** ${{ env.APP_TAG }}
             **Branch:** ${{ github.ref_name }}
             **Commit:** ${{ github.sha }}
 
             ### 📥 Como instalar:
             1. Baixe o arquivo `ZUVEX-*.apk` abaixo
-            2. No celular: Configurações → Segurança → Fontes desconhecidas ✅
-            3. Abra o arquivo APK para instalar
+            2. No celular: autorize a instalação de fontes desconhecidas se solicitado
+            3. Abra o arquivo APK para instalar ou atualizar
 
-            > 💳 **BotaPix Integrado** — Pagamentos via Pix Dinâmico Oficial BotaPix / Efí Bank (BACEN)
+            > ⚡ **Pix Integrado** — Pagamentos instantâneos com liberação automática de anúncios.
           files: artifacts/*.apk
           draft: false
           prerelease: false
