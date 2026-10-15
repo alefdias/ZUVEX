@@ -67,8 +67,8 @@ class PaymentService implements IPaymentGateway {
     final cleanName = merchantName.length > 25 ? merchantName.substring(0, 25) : merchantName;
     final cleanCity = merchantCity.length > 15 ? merchantCity.substring(0, 15) : merchantCity;
     final amountStr = amount.toStringAsFixed(2);
-    final cleanTxid = (txid.isEmpty || txid == '***') ? '***' : txid.replaceAll(RegExp(r'[^a-zA-Z0-9]'), '');
-    final finalTxid = cleanTxid.length > 25 ? cleanTxid.substring(0, 25) : cleanTxid;
+    // Para Pix estático manual, o padrão oficial BACEN exige txid literal *** para garantir aceitação universal em todos os bancos
+    const finalTxid = '***';
 
     // GUI oficial do Banco Central: BR.GOV.BCB.PIX em maiúsculo
     final maiGui = '0014BR.GOV.BCB.PIX';
@@ -76,8 +76,9 @@ class PaymentService implements IPaymentGateway {
     final maiContent = '$maiGui$maiKey';
     final mai = '26${maiContent.length.toString().padLeft(2, '0')}$maiContent';
 
-    // 010212 = Ponto de Iniciação: QR Code Estático com valor pré-definido
-    final poi = '010212';
+    // 010211 = Ponto de Iniciação: QR Code Estático (MANDATÓRIO pelo BACEN para chaves Pix diretas)
+    // Se usar 010212 aqui, os bancos tentam buscar cobrança dinâmica via URL e dão erro "Pix não reconhecido"
+    final poi = '010211';
     final mcc = '52040000';
     final curr = '5303986'; // Real Brasileiro
     final amt = '54${amountStr.length.toString().padLeft(2, '0')}$amountStr';
@@ -157,25 +158,53 @@ class PaymentService implements IPaymentGateway {
             ).timeout(const Duration(seconds: 8));
 
             if (pageRes.statusCode == 200) {
-              // Desescapa barras e aspas da página Inertia.js
-              final normalized = pageRes.body
-                  .replaceAll(r'\/', '/')
-                  .replaceAll('&quot;', '"');
-
-              // 1. Busca código Pix Copia e Cola Oficial
-              final pixMatch = RegExp(r'(000201[A-Za-z0-9\.\_\-\/\*]+6304[A-Fa-f0-9]{4})')
-                  .firstMatch(normalized);
-              if (pixMatch != null) {
-                pixCopiaECola = pixMatch.group(1)!;
-                debugPrint('✅ [BotaPix] Código Pix Copia e Cola Oficial extraído com sucesso!');
+              // 1. Método Principal: Extração precisa via JSON da prop transaction do Inertia.js
+              try {
+                final dataPageMatch = RegExp(r'data-page="([^"]+)"').firstMatch(pageRes.body);
+                if (dataPageMatch != null) {
+                  final rawData = dataPageMatch.group(1)!
+                      .replaceAll('&quot;', '"')
+                      .replaceAll('&amp;', '&')
+                      .replaceAll('&lt;', '<')
+                      .replaceAll('&gt;', '>');
+                  final parsed = jsonDecode(rawData);
+                  final tx = parsed['props']?['transaction'];
+                  if (tx != null) {
+                    final rawPix = tx['pix_copia_cola']?.toString() ?? '';
+                    final rawQr = tx['qr_code']?.toString() ?? '';
+                    if (rawPix.startsWith('000201')) {
+                      pixCopiaECola = rawPix.trim();
+                      debugPrint('✅ [BotaPix] Código Pix Oficial extraído via data-page JSON!');
+                    }
+                    if (rawQr.isNotEmpty) {
+                      pixQrCode = rawQr.trim();
+                      debugPrint('✅ [BotaPix] QR Code Base64 extraído via data-page JSON!');
+                    }
+                  }
+                }
+              } catch (e) {
+                debugPrint('⚠️ [BotaPix] Falha no parse JSON de data-page: $e');
               }
 
-              // 2. Busca imagem QR Code gerada pelo BotaPix / Efí Bank em base64
-              final qrMatch = RegExp(r'(data:image\/png;base64,[A-Za-z0-9+/=]+)')
-                  .firstMatch(normalized);
-              if (qrMatch != null) {
-                pixQrCode = qrMatch.group(1)!;
-                debugPrint('✅ [BotaPix] Imagem QR Code Base64 extraída com sucesso!');
+              // 2. Fallback via regex caso o parse do JSON falhe
+              if (pixCopiaECola.isEmpty) {
+                final normalized = pageRes.body
+                    .replaceAll(r'\/', '/')
+                    .replaceAll('&quot;', '"');
+
+                final pixMatch = RegExp(r'(000201[A-Za-z0-9\.\_\-\/\*]+6304[A-Fa-f0-9]{4})')
+                    .firstMatch(normalized);
+                if (pixMatch != null) {
+                  pixCopiaECola = pixMatch.group(1)!.trim();
+                  debugPrint('✅ [BotaPix] Código Pix Copia e Cola Oficial extraído via Regex!');
+                }
+
+                final qrMatch = RegExp(r'(data:image\/png;base64,[A-Za-z0-9+/=]+)')
+                    .firstMatch(normalized);
+                if (qrMatch != null) {
+                  pixQrCode = qrMatch.group(1)!.trim();
+                  debugPrint('✅ [BotaPix] Imagem QR Code Base64 extraída via Regex!');
+                }
               }
             }
           } catch (e) {
@@ -197,8 +226,8 @@ class PaymentService implements IPaymentGateway {
         merchantName: 'ALEF DIAS ZUVEX',
         merchantCity: 'PROMISSAO',
         amount: plan.price,
-        txid: botaPixId != null ? 'ZUV${botaPixId.replaceAll(RegExp(r'[^a-zA-Z0-9]'), '')}' : '***',
-      );
+        txid: '***',
+      ).trim();
     }
 
     // 3. Se a imagem do QR Code em base64 não foi obtida, gera a imagem a partir do Copia e Cola
@@ -208,6 +237,7 @@ class PaymentService implements IPaymentGateway {
     }
 
     debugPrint('📱 [Pix] Payload pronto para o banco: ${pixCopiaECola.substring(0, min(50, pixCopiaECola.length))}...');
+
 
     final txId = botaPixId ?? 'tx_${DateTime.now().millisecondsSinceEpoch}_${Random().nextInt(9999)}';
 

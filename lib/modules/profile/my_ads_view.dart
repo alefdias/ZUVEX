@@ -511,7 +511,7 @@ class _PixActivationSheetState extends State<_PixActivationSheet> {
                             icon: const Icon(Icons.copy_rounded, color: Colors.white, size: 18),
                             label: const Text('Copiar Código Pix (Copia e Cola)', style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
                             onPressed: () {
-                              Clipboard.setData(ClipboardData(text: tx.pixCopiaECola));
+                              Clipboard.setData(ClipboardData(text: tx.pixCopiaECola.trim()));
                               Get.snackbar('Copiado!', 'Código Pix copiado com sucesso. Cole no app do seu banco para pagar.', backgroundColor: AppColors.success, colorText: Colors.white);
                             },
                           ),

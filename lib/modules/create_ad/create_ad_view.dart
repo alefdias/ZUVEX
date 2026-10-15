@@ -751,7 +751,7 @@ class _Step3Payment extends StatelessWidget {
                 padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
               ),
               onPressed: () {
-                Clipboard.setData(ClipboardData(text: tx.pixCopiaECola));
+                Clipboard.setData(ClipboardData(text: tx.pixCopiaECola.trim()));
                 Get.snackbar(
                   'Copiado!',
                   'Código Pix copiado! Cole no aplicativo do seu banco.',
